@@ -18,12 +18,6 @@ import android.graphics.Canvas;
 /**
  * 二维码生成工具类
  *
- * @param content   内容
- * @param widthPix  图片宽度
- * @param heightPix 图片高度
- * @param logoBm    二维码中心的Logo图标（可以为null）
- * @param filePath  用于存储二维码图片的文件路径
- * @return 生成二维码及保存文件是否成功
  */
 public class QRCodeUtil {
 
