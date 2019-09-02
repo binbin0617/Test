@@ -1,6 +1,0 @@
-<resources>
-    <string name="app_name">scanner</string>
-
-    <!-- 二维码扫描 -->
-    <string name="activity_qrscan_title">二维码扫描</string>
-</resources>

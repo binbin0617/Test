@@ -1,1 +1,1 @@
-include ':app', ':mylibrary',':sadlibrary',':scanner-all',':scanner-zxing'
+include ':app', ':mylibrary'
