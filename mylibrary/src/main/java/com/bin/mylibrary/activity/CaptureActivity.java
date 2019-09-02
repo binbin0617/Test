@@ -49,17 +49,17 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.bin.mylibrary.R;
+import com.bin.mylibrary.alert.SweetAlertDialog;
 import com.bin.mylibrary.camera.CameraManager;
 import com.bin.mylibrary.decode.DecodeThread;
 import com.bin.mylibrary.decode.MyPlanarYUVLuminanceSource;
 import com.bin.mylibrary.utils.BeepManager;
 import com.bin.mylibrary.utils.InactivityTimer;
 import com.google.zxing.Result;
-import com.phynos.scanner.all.R;
 
 import java.io.IOException;
 
-import cn.pedant.SweetAlert.SweetAlertDialog;
 
 /**
  * This activity opens the camera and does the actual scanning on a background

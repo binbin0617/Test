@@ -25,10 +25,10 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 
+import com.bin.mylibrary.R;
 import com.bin.mylibrary.camera.CameraManager;
 import com.bin.mylibrary.decode.DecodeThread;
 import com.google.zxing.Result;
-import com.phynos.scanner.all.R;
 
 
 /**
