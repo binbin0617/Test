@@ -2,16 +2,18 @@ package com.bin.test;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.util.Base64;
+import android.view.View;
 import android.widget.ImageView;
 
+import com.bin.mylibrary.aty.MainAty;
 import com.bumptech.glide.Glide;
 
 public class MainActivity extends AppCompatActivity {
-    private ImageView img;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -30,5 +32,9 @@ public class MainActivity extends AppCompatActivity {
 //        byte[] bytes = Base64.decode(baseStr, Base64.DEFAULT);
 //        Bitmap bitmap= BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
 //        Glide.with(MainActivity.this).load(bitmap).into(img);
+    }
+
+    public void click(View view) {
+        startActivity(new Intent(this, MainAty.class));
     }
 }

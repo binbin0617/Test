@@ -28,4 +28,13 @@
     <color name="material_blue_grey_95">#ff21272b</color>
     <color name="material_deep_teal_20">#ff80cbc4</color>
     <color name="material_deep_teal_50">#ff009688</color>
+
+    <color name="transparent">#00000000</color>
+    <color name="txt_color">#333333</color>
+    <!--EditText提示语颜色  一下下滑线-->
+    <color name="hint_color">#AAAAAA</color>
+    <color name="back_wx">#F2F2F2</color>
+    <color name="text_wx">#A4A4A4</color>
+    <color name="back_blue">#1296eb</color>
+    <color name="back_blue1">#40b5fb</color>
 </resources>

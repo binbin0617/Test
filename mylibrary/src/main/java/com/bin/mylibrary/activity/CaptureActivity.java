@@ -50,7 +50,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.bin.mylibrary.R;
-import com.bin.mylibrary.alert.SweetAlertDialog;
 import com.bin.mylibrary.camera.CameraManager;
 import com.bin.mylibrary.decode.DecodeThread;
 import com.bin.mylibrary.decode.MyPlanarYUVLuminanceSource;
@@ -59,6 +58,8 @@ import com.bin.mylibrary.utils.InactivityTimer;
 import com.google.zxing.Result;
 
 import java.io.IOException;
+
+import cn.pedant.SweetAlert.SweetAlertDialog;
 
 
 /**
