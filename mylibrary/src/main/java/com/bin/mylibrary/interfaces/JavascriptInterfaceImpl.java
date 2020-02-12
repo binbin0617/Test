@@ -260,28 +260,28 @@ public class JavascriptInterfaceImpl extends RequestMa {
     /**
      * 保存用户信息
      */
-    @JavascriptInterface
-    public String setUserinfo(String data) {
-//        String dataTrim = data.replace(" ", "");
-        // 保存用户信息到手机本地
-        LogUtils.e(TAG, "data   =" + data);
-        SharedPreferences.Editor editor = mActivity.getSharedPreferences("userinfoTest", Context.MODE_PRIVATE).edit();
-        editor.putString("data", data);
-        editor.commit();
-        setTags(data);
-        mActivity.startActivity(new Intent(mActivity, MainAty.class));
-        SharedPreferences dataInfo = mActivity.getSharedPreferences("userinfoTest", Context.MODE_PRIVATE);
-        String userStr = dataInfo.getString("data", "");
-        com.alibaba.fastjson.JSONObject user = null;
-        if (!"".equals(userStr.trim())) {
-            // 用户信息不能为空
-            user = JSON.parseObject(userStr);
-            BaseWebAty.baseUrl = user.getString("loginUrl") + "/htAppWeb2";
-        }
-        finish();
-        LogUtils.e(TAG, "setUserinfo");
-        return "success";
-    }
+//    @JavascriptInterface
+//    public String setUserinfo(String data) {
+////        String dataTrim = data.replace(" ", "");
+//        // 保存用户信息到手机本地
+//        LogUtils.e(TAG, "data   =" + data);
+//        SharedPreferences.Editor editor = mActivity.getSharedPreferences("userinfoTest", Context.MODE_PRIVATE).edit();
+//        editor.putString("data", data);
+//        editor.commit();
+//        setTags(data);
+//        mActivity.startActivity(new Intent(mActivity, MainAty.class));
+//        SharedPreferences dataInfo = mActivity.getSharedPreferences("userinfoTest", Context.MODE_PRIVATE);
+//        String userStr = dataInfo.getString("data", "");
+//        com.alibaba.fastjson.JSONObject user = null;
+//        if (!"".equals(userStr.trim())) {
+//            // 用户信息不能为空
+//            user = JSON.parseObject(userStr);
+//            BaseWebAty.baseUrl = user.getString("loginUrl") + "/htAppWeb2";
+//        }
+//        finish();
+//        LogUtils.e(TAG, "setUserinfo");
+//        return "success";
+//    }
 
     /**
      * 取得用户信息

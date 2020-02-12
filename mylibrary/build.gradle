@@ -66,7 +66,7 @@ dependencies {
     api 'com.scwang.smartrefresh:SmartRefreshHeader:1.0.3'
     //上下滑动插件
     api 'com.lcodecorex:tkrefreshlayout:1.0.7'
-    api 'com.coolindicator.sdk:coolindicator:1.0.0-beta'
+    api 'com.github.Justson:CoolIndicator:v1.0.0'
     //App更新https://beta.bugly.qq.com
     api 'com.tencent.bugly:crashreport_upgrade:1.2.0'
     //其中latest.release指代最新版本号，也可以指定明确的版本号，例如1.2.0

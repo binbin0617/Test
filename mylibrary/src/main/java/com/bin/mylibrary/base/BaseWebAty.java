@@ -73,6 +73,7 @@ public abstract class BaseWebAty extends AppCompatActivity {
      * 首页访问url
      **/
     public static String baseUrl = "http://114.115.204.49/htAppWeb2";
+    public static String baseUrlStatic = "http://114.115.204.49/htAppWeb2";
 
     /**
      * 磊本地地址
@@ -136,6 +137,10 @@ public abstract class BaseWebAty extends AppCompatActivity {
         }
     }
 
+    public static void init(String url){
+        baseUrlStatic = url;
+    }
+
     /**
      * 设置WebView相关属性以及打开webView和js的交互
      */
@@ -156,7 +161,8 @@ public abstract class BaseWebAty extends AppCompatActivity {
                 .setSecurityType(AgentWeb.SecurityType.STRICT_CHECK)
                 .createAgentWeb()
                 .ready()
-                .go(getUrl());
+                .go(baseUrlStatic);
+//                .go(url);
         WebSettings ws = mAgentWeb.getWebCreator().getWebView().getSettings();
         ws.setUseWideViewPort(true);
         ws.setAllowFileAccess(true);
