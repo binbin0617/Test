@@ -41,13 +41,9 @@ dependencies {
     implementation 'com.android.support:design:28.0.0'
     api 'com.pnikosis:materialish-progress:1.0'
     // agentWeb 加强版webview
-    api 'com.just.agentweb:agentweb:4.0.3-beta'
-    // (必选)
-    api 'com.just.agentweb:filechooser:4.0.3-beta'
-    // (可选)
-    api 'com.just.agentweb:download:4.0.3-beta'
-    // (可选)
-    api 'com.github.Justson:Downloader:v4.0.3'
+    api 'com.just.agentweb:agentweb:4.1.2' // (必选)
+    api 'com.just.agentweb:filechooser:4.1.2'// (可选)
+    api 'com.download.library:Downloader:4.1.2'// (可选)
     // webview页面图片长按查看
     api 'it.sephiroth.android.library.imagezoom:imagezoom:+'
     // json转换

@@ -63,6 +63,7 @@
             android:visibility="invisible"
             app:backgroundTint="@color/back_blue"
             app:borderWidth="0dp"
+
             android:clickable="true"
             app:elevation="6dp"
             app:fabSize="mini"

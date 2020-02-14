@@ -90,9 +90,9 @@ public class MainAty extends BaseWebAty {
 
     private FloatingDraftButton floatingDraftButton;
 
-    private FloatingActionButton fab_refresh;
+//    private FloatingActionButton fab_refresh;
     private FloatingActionButton fab_back;
-    private FloatingActionButton fab_speak;
+//    private FloatingActionButton fab_speak;
 
     // 调用相机取得对照原相片返回结果
     private static final int REQUEST_CODE_HEADCAMERA = 1002;
@@ -135,12 +135,12 @@ public class MainAty extends BaseWebAty {
 
     private void initView() {
         floatingDraftButton =findViewById(R.id.floatingActionButton);
-        fab_refresh = findViewById(R.id.fab_refresh);
+//        fab_refresh = findViewById(R.id.fab_refresh);
         fab_back = findViewById(R.id.fab_back);
-        fab_speak = findViewById(R.id.fab_speak);
-        floatingDraftButton.registerButton(fab_refresh);
+//        fab_speak = findViewById(R.id.fab_speak);
+//        floatingDraftButton.registerButton(fab_refresh);
         floatingDraftButton.registerButton(fab_back);
-        floatingDraftButton.registerButton(fab_speak);
+//        floatingDraftButton.registerButton(fab_speak);
         // 接口添加
         mWebView = mAgentWeb.getWebCreator().getWebView();
         javascriptInterface = new JavascriptInterfaceImpl(this, mWebView);
@@ -155,32 +155,33 @@ public class MainAty extends BaseWebAty {
                 AnimationUtil.slideButtons(MainAty.this, floatingDraftButton);
             }
         });
-        fab_refresh.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (mSmartRefreshLayout != null) {
-                    mSmartRefreshLayout.setEnableRefresh(true);
-                    mSmartRefreshLayout.autoRefresh();
-                    AnimationUtil.slideButtons(MainAty.this, floatingDraftButton);
-                }
-            }
-        });
+//        fab_refresh.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View view) {
+//                if (mSmartRefreshLayout != null) {
+//                    mSmartRefreshLayout.setEnableRefresh(true);
+//                    mSmartRefreshLayout.autoRefresh();
+//                    AnimationUtil.slideButtons(MainAty.this, floatingDraftButton);
+//                }
+//            }
+//        });
         fab_back.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if (javascriptInterface != null) {
-                    javascriptInterface.finish();
-                    AnimationUtil.slideButtons(MainAty.this, floatingDraftButton);
-                }
+                MainAty.this.finish();
+//                if (javascriptInterface != null) {
+//                    javascriptInterface.finish();
+//                    AnimationUtil.slideButtons(MainAty.this, floatingDraftButton);
+//                }
             }
         });
-        fab_speak.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                AnimationUtil.slideButtons(MainAty.this, floatingDraftButton);
-                startActivity(new Intent(MainAty.this, SpeakTestAty.class));
-            }
-        });
+//        fab_speak.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View view) {
+//                AnimationUtil.slideButtons(MainAty.this, floatingDraftButton);
+//                startActivity(new Intent(MainAty.this, SpeakTestAty.class));
+//            }
+//        });
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
