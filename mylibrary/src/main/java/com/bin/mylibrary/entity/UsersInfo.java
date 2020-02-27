@@ -13,9 +13,43 @@ public class UsersInfo {
      */
 
     private String name;
+
+    @Override
+    public String toString() {
+        return "{" +
+                "\"name\"" + ":" + "\"" + name + "\"" + "," +
+                "\"idType\"" + ":" + "\"" + idType + "\"" + "," +
+                "\"idNo\"" + ":" + "\"" + idNo + "\"" + "," +
+                "\"phoneNo\"" + ":" + "\"" + phoneNo + "\"" + "," +
+                "\"notAfter\"" + ":" + "\"" + notAfter + "\"" + "," +
+                "\"notBefore\"" + ":" + "\"" + notBefore + "\"" + "," +
+//                "\"data\"" + ":" + "\"" + data.toString() + "\"" +
+                "\"data\"" + ":" + data.toString() +
+                "}";
+    }
+
     private String idType;
     private String idNo;
     private String phoneNo;
+    private String notAfter;
+    private String notBefore;
+
+    public String getNotAfter() {
+        return notAfter;
+    }
+
+    public void setNotAfter(String notAfter) {
+        this.notAfter = notAfter;
+    }
+
+    public String getNotBefore() {
+        return notBefore;
+    }
+
+    public void setNotBefore(String notBefore) {
+        this.notBefore = notBefore;
+    }
+
     private DataBean data;
 
     public String getName() {
@@ -88,12 +122,12 @@ public class UsersInfo {
         @Override
         public String toString() {
             return "{" +
-                    "\"businessRunningNo\"" + ":" + "\"" + businessRunningNo + "\"" +","+
-                    "\"createDate\"" + ":" + "\"" + createDate + "\"" +","+
-                    "\"service\"" + ":" + "\"" + service + "\"" +","+
-                    "\"attach\"" + ":" + "\"" + attach + "\"" +","+
-                    "\"certSN\"" + ":" + "\"" + certSN + "\"" +","+
-                    "\"usePIN\"" + ":" + "\"" + usePIN + "\"" +","+
+                    "\"businessRunningNo\"" + ":" + "\"" + businessRunningNo + "\"" + "," +
+                    "\"createDate\"" + ":" + "\"" + createDate + "\"" + "," +
+                    "\"service\"" + ":" + "\"" + service + "\"" + "," +
+                    "\"attach\"" + ":" + "\"" + attach + "\"" + "," +
+                    "\"certSN\"" + ":" + "\"" + certSN + "\"" + "," +
+                    "\"usePIN\"" + ":" + "\"" + usePIN + "\"" + "," +
                     "\"businessText\"" + ":" + "\"" + businessText + "\"" +
                     "}";
         }

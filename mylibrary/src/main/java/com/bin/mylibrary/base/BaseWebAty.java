@@ -3,6 +3,13 @@ package com.bin.mylibrary.base;
 import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.support.annotation.ColorInt;
+import android.support.annotation.LayoutRes;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
+import android.support.v7.app.AppCompatActivity;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,13 +20,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 
-import androidx.annotation.ColorInt;
-import androidx.annotation.LayoutRes;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
 import com.bin.mylibrary.R;
 import com.bin.mylibrary.aty.MainAty;
@@ -43,7 +43,7 @@ import com.scwang.smartrefresh.layout.listener.OnRefreshListener;
 import java.util.ArrayList;
 import java.util.List;
 
-public abstract class BaseWebAty extends AppCompatActivity {
+public abstract class BaseWebAty extends AppCompatActivity implements com.szht.htappfuture.interfaces.RequestMa {
     protected AgentWeb mAgentWeb;
     protected WebView mWebView;
     private JavascriptInterfaceImpl mJavascriptInterfaceImpl;

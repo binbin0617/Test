@@ -1,8 +1,18 @@
 package com.bin.mylibrary.base;
 
 import android.app.Application;
+import android.util.Log;
 
+import com.baidu.idl.face.platform.FaceSDKManager;
+import com.baidu.idl.face.platform.LivenessTypeEnum;
+import com.baidu.ocr.sdk.model.AccessToken;
+import com.bin.mylibrary.faceReg.APIService;
+import com.bin.mylibrary.faceReg.FaceException;
+import com.bin.mylibrary.faceReg.OnResultListener;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import cn.com.cfca.sdk.hke.HKEServiceType;
@@ -27,9 +37,13 @@ public class BaseApplication extends Application {
 
     // 保存拍照调用的照片
     public static String photoBase64;
+    //保存文档地址和名字的集合
+    public static Map<String,String> fileMap;
     // 展示用图片
     public static String picBase64;
 
+    //上传文档json
+    public static String documentBase64;
     //云证通参数
     public static String APPID = "APP_SHENZHOUHAOTIAN";
     public static String bankID = "SHENZHOUHAOTIAN";
@@ -40,12 +54,12 @@ public class BaseApplication extends Application {
     private static Map<String, String> stateMap;
 
     // 百度人脸识别相关
-//    public static String licenseID = "htappFuture2-face-android";
-//    public static String licenseFileName = "idl-license.face-android";
-//    public static String apiKey = "oLZOctDLwBvcOe3ytgVsA2oX";
-//    public static String secretKey = "6LZ7TUgReSYeWG82WugaDp6mnLuz5odp";
-//    public static List<LivenessTypeEnum> livenessList = new ArrayList<LivenessTypeEnum>();
-//    public static boolean isLivenessRandom = false;
+    public static List<LivenessTypeEnum> livenessList = new ArrayList<LivenessTypeEnum>();
+    public static boolean isLivenessRandom = false;
+
+    //小米推送
+    public static final String APP_ID = "2882303761518172712";
+    public static final String APP_KEY = "5481817267712";
 
     public static String getOnLongClickPhotoBase64() {
         return onLongClickPhotoBase64;
@@ -57,35 +71,36 @@ public class BaseApplication extends Application {
 
     public static String onLongClickPhotoBase64;
 
+
     @Override
     public void onCreate() {
         super.onCreate();
+        fileMap = new HashMap<>();
         // 百度活体识别初始化sdk
-//        FaceSDKManager.getInstance().initialize(this, licenseID, licenseFileName);
         // 百度人脸服务token取得
-//        initAccessToken();
         initHKE();
 //        JPushInterface.init(getApplicationContext());
+//        JAnalyticsInterface.init(getApplicationContext());
+//        JAnalyticsInterface.setDebugMode(true);
 //        Bugly.init(getApplicationContext(), "2853450716", false);
+//        Beta.initDelay = 1*1000;
+
+
+        // 初始化SDK
+//        UMConfigure.init(this, "5e16d0294ca3572fd500003d", "Umeng", UMConfigure.DEVICE_TYPE_PHONE, null);
+////        // 选用AUTO页面采集模式
+//        MobclickAgent.setPageCollectionMode(MobclickAgent.PageMode.AUTO);
+//        // 支持在子进程中统计自定义事件
+//        UMConfigure.setProcessEvent(true);
+//        UMConfigure.setLogEnabled(true);
+//
+//        MobclickAgent.setDebugMode(true);
+//        // 初始化SDK
+//        UMConfigure.init(this, "5e16d0294ca3572fd500003d", "Umeng", UMConfigure.DEVICE_TYPE_PHONE, null);
+//        // 选用AUTO页面采集模式
+//        MobclickAgent.setPageCollectionMode(MobclickAgent.PageMode.AUTO);
     }
 
-//    private void initAccessToken() {
-//        APIService.getInstance().init(this);
-//        // 用ak，sk获取token, 调用在线api，如：注册、识别等。为了ak、sk安全，建议放您的服务器，
-//        APIService.getInstance().initAccessTokenWithAkSk(new OnResultListener<AccessToken>() {
-//            @Override
-//            public void onResult(AccessToken result) {
-//                Log.i("百度人脸识别", "AccessToken->" + result.getAccessToken());
-//            }
-//
-//            @Override
-//            public void onError(FaceException error) {
-//                Log.e("百度人脸识别", "AccessTokenError:" + error);
-//                error.printStackTrace();
-//
-//            }
-//        }, apiKey, secretKey);
-//    }
 
     /**
      * @return sweetalertdialog
@@ -121,4 +136,8 @@ public class BaseApplication extends Application {
         hkeWithPasswordApi = HKEWithPasswordApi.getInstance();
     }
 
+    private void initState() {
+        stateMap = new HashMap<>();
+        stateMap.put("", "");
+    }
 }

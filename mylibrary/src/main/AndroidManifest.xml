@@ -7,15 +7,20 @@
     <uses-feature android:name="android.hardware.camera" /> <!-- 使用照相机权限 -->
     <uses-feature android:name="android.hardware.camera.autofocus" /> <!-- 自动聚焦权限 -->
     <!-- 震动权限 -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+
     <application android:allowBackup="true"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:name=".base.BaseApplication"
         >
             <!-- 二维码扫描 -->
             <activity
@@ -28,9 +33,26 @@
         <activity android:name="com.bin.mylibrary.aty.CheckPasswordAty"/>
         <activity android:name="com.bin.mylibrary.aty.ImageViewAty"/>
         <activity android:name="com.bin.mylibrary.aty.InputPasswordAty"/>
-        <activity android:name="com.bin.mylibrary.aty.SpeakTestAty"/>
+        <activity android:name="com.bin.mylibrary.aty.SpeakTestAty"
+            android:screenOrientation="portrait"/>
         <activity android:name="com.bin.mylibrary.aty.TestWebViewAty"/>
         <activity android:name="com.bin.mylibrary.aty.UpdatePINAty"/>
+        <activity android:name=".faceReg.FaceDetectExpActivity" />
+        <activity android:name=".faceReg.FaceLivenessExpActivity" />
+        <activity android:name="com.baidu.ocr.ui.camera.CameraActivity" />
+
+
+        <service android:name="com.baidu.speech.VoiceRecognitionService" android:exported="false" />
+        <activity
+            android:name="com.baidu.voicerecognition.android.ui.BaiduASRDigitalDialog"
+            android:configChanges="orientation|keyboardHidden|screenLayout"
+            android:exported="false"
+            android:theme="@android:style/Theme.Dialog">
+            <intent-filter>
+                <action android:name="com.baidu.action.RECOGNIZE_SPEECH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
     </application>
 
 

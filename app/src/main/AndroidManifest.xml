@@ -6,9 +6,10 @@
 
 
     <application
+        android:name=".TestApplication"
         android:allowBackup="true"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat"
+        android:theme="@style/Theme.Design.NoActionBar"
         android:usesCleartextTraffic="true"
         tools:ignore="GoogleAppIndexingWarning">
         <activity android:name=".MainActivity">
@@ -19,6 +20,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!--百度语音-->
+        <meta-data
+            android:name="com.baidu.speech.APP_ID"
+            android:value="18589457" />
+        <meta-data
+            android:name="com.baidu.speech.API_KEY"
+            android:value="K6FeSB05OuFh9SDrTbvYoqRz" />
+        <meta-data
+            android:name="com.baidu.speech.SECRET_KEY"
+            android:value="qQzX2IkPsOmz8Fqh1NmHfTHkcAT89iUs" />
 
     </application>
 

@@ -1,6 +1,7 @@
 package com.bin.mylibrary.utils;
 
 import android.content.Context;
+import android.support.design.widget.FloatingActionButton;
 import android.view.View;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.AlphaAnimation;
@@ -11,7 +12,6 @@ import android.view.animation.TranslateAnimation;
 
 
 import com.bin.mylibrary.view.FloatingDraftButton;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
 import java.util.Random;

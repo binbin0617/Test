@@ -37,4 +37,8 @@
     <color name="text_wx">#A4A4A4</color>
     <color name="back_blue">#1296eb</color>
     <color name="back_blue1">#40b5fb</color>
+    <color name="color_212121">#212121</color>
+    <color name="color_757575">#757575</color>
+    <color name="color_f5f5f5">#f5f5f5</color>
+    <color name="color_333333">#333333</color>
 </resources>

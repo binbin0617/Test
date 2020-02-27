@@ -7,7 +7,7 @@
     app:srlAccentColor="@android:color/white"
     app:srlEnableHeaderTranslationContent="false"
     app:srlEnablePreviewInEditMode="false"
-    >
+    app:srlPrimaryColor="@color/colorPrimary">
     <!--<com.scwang.smartrefresh.header.PhoenixHeader-->
     <!--android:id="@+id/header"-->
     <!--android:layout_width="match_parent"-->

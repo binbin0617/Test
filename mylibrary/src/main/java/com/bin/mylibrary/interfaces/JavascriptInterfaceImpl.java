@@ -2,11 +2,9 @@ package com.bin.mylibrary.interfaces;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.app.Activity;
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
+import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -14,45 +12,69 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.hardware.fingerprint.FingerprintManager;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.provider.MediaStore;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import android.support.v4.content.ContextCompat;
+import android.support.v4.content.FileProvider;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
-import android.util.Log;
+import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.ValueCallback;
 import android.webkit.WebView;
+import android.widget.TextView;
 import android.widget.Toast;
-
-import androidx.core.app.NotificationCompat;
-import androidx.core.content.ContextCompat;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.baidu.idl.face.platform.FaceConfig;
+import com.baidu.idl.face.platform.FaceEnvironment;
+import com.baidu.idl.face.platform.FaceSDKManager;
+import com.baidu.idl.face.platform.LivenessTypeEnum;
+import com.baidu.ocr.sdk.OCR;
+import com.baidu.ocr.sdk.OnResultListener;
+import com.baidu.ocr.sdk.exception.OCRError;
+import com.baidu.ocr.sdk.model.AccessToken;
+import com.baidu.ocr.sdk.model.BankCardResult;
+import com.baidu.ocr.ui.camera.CameraActivity;
+import com.baidu.ocr.ui.camera.CameraNativeHelper;
+import com.baidu.ocr.ui.camera.CameraView;
 import com.bin.mylibrary.R;
 import com.bin.mylibrary.activity.CaptureActivity;
 import com.bin.mylibrary.aty.CheckPasswordAty;
+import com.bin.mylibrary.aty.FolderAty;
 import com.bin.mylibrary.aty.InputPasswordAty;
 import com.bin.mylibrary.aty.MainAty;
 import com.bin.mylibrary.aty.TestWebViewAty;
 import com.bin.mylibrary.aty.UpdatePINAty;
 import com.bin.mylibrary.base.BaseApplication;
 import com.bin.mylibrary.base.BaseWebAty;
-import com.bin.mylibrary.cossphoto.CompressImageTask;
-import com.bin.mylibrary.cossphoto.ImageConfig;
+import com.bin.mylibrary.entity.BiometricsEntity;
+import com.bin.mylibrary.entity.UploadMenu;
 import com.bin.mylibrary.entity.UsersInfo;
 import com.bin.mylibrary.entity.VerifyP7;
+import com.bin.mylibrary.faceReg.FaceDetectExpActivity;
+import com.bin.mylibrary.faceReg.FaceLivenessExpActivity;
+//import com.bin.mylibrary.utils.PictureProcessor;
 import com.bin.mylibrary.utils.FileUtil;
 import com.bin.mylibrary.utils.Glide4Engine;
 import com.bin.mylibrary.utils.LogUtils;
-import com.bin.mylibrary.utils.RequestMa;
 import com.bin.mylibrary.utils.Utils;
+import com.bin.mylibrary.zhiwen.FingerprintDialogFragment;
+import com.bin.mylibrary.zhiwen.PhoneInfoCheck;
 import com.google.gson.Gson;
 import com.zhihu.matisse.Matisse;
 import com.zhihu.matisse.MimeType;
+import com.zhihu.matisse.internal.entity.CaptureStrategy;
 
 import org.json.JSONException;
 import org.ksoap2.SoapFault;
@@ -63,8 +85,14 @@ import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.security.KeyStore;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
 
 import cn.com.cfca.sdk.hke.Callback;
 import cn.com.cfca.sdk.hke.HKEException;
@@ -72,8 +100,10 @@ import cn.com.cfca.sdk.hke.HKEWithPasswordApi;
 import cn.com.cfca.sdk.hke.data.AuthenticateInfo;
 import cn.com.cfca.sdk.hke.data.CFCACertificate;
 import cn.pedant.SweetAlert.SweetAlertDialog;
+import sakura.bottommenulibrary.bottompopfragmentmenu.BottomMenuFragment;
+import sakura.bottommenulibrary.bottompopfragmentmenu.MenuItem;
 
-import static android.content.Context.NOTIFICATION_SERVICE;
+import static android.os.Build.BRAND;
 import static cn.pedant.SweetAlert.SweetAlertDialog.PROGRESS_TYPE;
 import static com.bin.mylibrary.base.BaseApplication.hkeWithPasswordApi;
 
@@ -81,89 +111,38 @@ import static com.bin.mylibrary.base.BaseApplication.hkeWithPasswordApi;
  * 自定义的Android代码和JavaScript代码之间的桥梁类
  * 参照自http://www.cnblogs.com/kuangbiao/p/5246492.html
  */
-public class JavascriptInterfaceImpl extends RequestMa {
-    private String WSDL_URI_FACE = "http://114.116.53.84:10001/Face/FaceCheck.ashx";
+public class JavascriptInterfaceImpl implements com.szht.htappfuture.interfaces.RequestMa {
     private final String TAG = JavascriptInterfaceImpl.class.getSimpleName();
     // 是否取得了百度调用token
     private boolean hasGotToken = false;
-    // 弹出通知用通知管理
-    NotificationManager mNotificationManager;
     // 与参照例子不同，这里用activity作为参数
     private Activity mActivity;
     private WebView mWebView;
     private Handler mHandler;
-    // 相机权限取得申请返回码
-    private static final int PHOTO_REQUEST_SAOYISAO = 1;
-    // 扫一扫打开相机返回码
-    private static final int REQUEST_OPEN_QRCODE = 6;
-    // 身份证相机权限取得申请返回码
-    private static final int PHOTO_REQUEST_SFZ = 801;
-    // 银行卡相机权限取得申请返回码
-    private static final int PHOTO_REQUEST_YHK = 802;
-    // 通用票据相机权限取得申请返回码
-    private static final int PHOTO_REQUEST_TYPJ = 803;
-    // 百度语音合成权限取得申请返回码
-    private static final int BAIDU_TTS_REQUEST = 804;
-    // 身份证相机结果取得返回码
-    private static final int REQUEST_CODE_CAMERA = 901;
-    // 银行卡相机结果取得返回码
-    private static final int REQUEST_CODE_BANKCARD = 902;
-    // 通用票据相机结果取得返回码
-    private static final int REQUEST_CODE_RECEIPT = 903;
-
-    // 调用相机取得对照原相片返回结果
-    private static final int REQUEST_CODE_HEADCAMERA = 1002;
-    // 调用活体检测并人脸对比后返回结果
-    private static final int REQUEST_CODE_FACEREG = 1003;
-    // 调用相机取得对照原相片申请返回码
-    private static final int HEADCAMERA_REQUEST = 1001;
-
-    //设置PIN码的返回码
-    private static final int REQUEST_PIN = 1005;
-    //验证PIN码的返回码
-    private static final int REQUEST_CHECK_PIN = 1006;
-    //修改PIN码的返回码
-    private static final int REQUEST_UPDATE_PIN = 1007;
-
-    // 相机权限取得申请返回码
-    private static final int OPEN_CAMERA_QRCODE = 617;
-
-    // 文件权限取得申请返回码
-    private static final int OPEN_FILE_QRCODE = 1008;
-    //获取到文件返回码
-    private static final int OPEN_FILE_RESULT_QRCODE = 1009;
-
-    //获取唯一标识去的申请返回码
-    private static final int GAIN_RESULT = 1111;
-
     //设置是否删除对比源
     public static boolean isDelFace = false;
-
-
     //交易信息
     private String businessText;
+    //CFCA前台传递回来的信息传回区
+    private String cfcaJson;
     private boolean isUpdatePIN = false;
-
     //获取当前设备的唯一id
     private String deviceId;
     //地址
     private String url;
-
     //webservices 调用所需要的参数
-//    private String WSDL_URI = "http://192.168.100.223:8080/YZT/HKELocalSignAndVerify";   测试服务器
-    private String WSDL_URI = "http://114.116.52.167:443/YZT/HKELocalSignAndVerify";
+    private String yztUrl = "";
+    //    private String WSDL_URI = "http://192.168.100.223:8080/YZT/HKELocalSignAndVerify";   测试服务器
+//    private String WSDL_URI = "http://114.115.168.37:8081/YZT/HKELocalSignAndVerify";
     //    private String WSDL_URI = "http://192.168.100.156/YZT/HKELocalSignAndVerify";   磊哥搭建的服务器
     private String namespace = "http://service.szht.com/";
     //组装签名数据接口
     private String getUserAutherInfoMethod = "getUserAutherInfo";
-    private String soapUserAction = "http://114.116.52.167:443/YZT/HKELocalSignAndVerify/getUserAutherInfo";
     private String AuthResult = "";
     //使用机构证书对数据P1签名
     private String getP1SignValueMethod = "getP1SignValue";
-    private String soapP1Action = "http://114.116.52.167:443/YZT/HKELocalSignAndVerify/getP1SignValue";
     //验证签名结果
     private String verifyP7SignMethod = "verifyP7Sign";
-    private String soapP7Action = "http://114.116.52.167:443/YZT/HKELocalSignAndVerify/verifyP7Sign";
     //对组装数据的签名结果
     private String p1Result = "";
     //对组装Json报文的签名结果
@@ -172,13 +151,10 @@ public class JavascriptInterfaceImpl extends RequestMa {
     private String jsonResult = "";
     //验证签名结果P7
     private boolean p7Result;
-
     //负责界面之间跳转的loading
     private SweetAlertDialog loadDialog;
     //极光用的参数
     public static int sequence = 1;
-
-    private List<String> photoList;
 
     /**
      * Instantiate the interface and set the context
@@ -187,9 +163,6 @@ public class JavascriptInterfaceImpl extends RequestMa {
         mActivity = activity;
         mWebView = webView;
         mHandler = new Handler(Looper.getMainLooper());
-        photoList = new ArrayList<>();
-        // 通知管理初期化
-        mNotificationManager = (NotificationManager) mActivity.getSystemService(NOTIFICATION_SERVICE);
     }
 
     /**
@@ -260,28 +233,32 @@ public class JavascriptInterfaceImpl extends RequestMa {
     /**
      * 保存用户信息
      */
-//    @JavascriptInterface
-//    public String setUserinfo(String data) {
-////        String dataTrim = data.replace(" ", "");
-//        // 保存用户信息到手机本地
-//        LogUtils.e(TAG, "data   =" + data);
-//        SharedPreferences.Editor editor = mActivity.getSharedPreferences("userinfoTest", Context.MODE_PRIVATE).edit();
-//        editor.putString("data", data);
-//        editor.commit();
-//        setTags(data);
-//        mActivity.startActivity(new Intent(mActivity, MainAty.class));
-//        SharedPreferences dataInfo = mActivity.getSharedPreferences("userinfoTest", Context.MODE_PRIVATE);
-//        String userStr = dataInfo.getString("data", "");
-//        com.alibaba.fastjson.JSONObject user = null;
-//        if (!"".equals(userStr.trim())) {
-//            // 用户信息不能为空
-//            user = JSON.parseObject(userStr);
-//            BaseWebAty.baseUrl = user.getString("loginUrl") + "/htAppWeb2";
+    @JavascriptInterface
+    public String setUserinfo(String data) {
+//        String dataTrim = data.replace(" ", "");
+        // 保存用户信息到手机本地
+        LogUtils.e(TAG, "data   =" + data);
+//        if (getUserinfo().equals("") || getUserinfo() == null) {
+//            setAccounts(data);
 //        }
-//        finish();
-//        LogUtils.e(TAG, "setUserinfo");
-//        return "success";
-//    }
+        SharedPreferences.Editor editor = mActivity.getSharedPreferences("userinfo", Context.MODE_PRIVATE).edit();
+        editor.putString("data", data);
+        editor.commit();
+//        setTags(data);
+        mActivity.startActivity(new Intent(mActivity, MainAty.class));
+        SharedPreferences dataInfo = mActivity.getSharedPreferences("userinfo", Context.MODE_PRIVATE);
+        String userStr = dataInfo.getString("data", "");
+        com.alibaba.fastjson.JSONObject user = null;
+        if (!"".equals(userStr.trim())) {
+            // 用户信息不能为空
+            user = JSON.parseObject(userStr);
+            BaseWebAty.baseUrl = user.getString("loginUrl") + "/htAppWeb2";
+        }
+        mActivity.finish();
+        LogUtils.e(TAG, "setUserinfo");
+        return "success";
+    }
+
 
     /**
      * 取得用户信息
@@ -289,7 +266,7 @@ public class JavascriptInterfaceImpl extends RequestMa {
     @JavascriptInterface
     public String getUserinfo() {
         // 取得本地用户信息
-        SharedPreferences dataInfo = mActivity.getSharedPreferences("userinfoTest", Context.MODE_PRIVATE);
+        SharedPreferences dataInfo = mActivity.getSharedPreferences("userinfo", Context.MODE_PRIVATE);
         LogUtils.e(TAG, dataInfo.getString("data", ""));
         return dataInfo.getString("data", "");
     }
@@ -300,65 +277,12 @@ public class JavascriptInterfaceImpl extends RequestMa {
     @JavascriptInterface
     public void getUserinfoSync() {
         // 取得本地用户信息
-        SharedPreferences dataInfo = mActivity.getSharedPreferences("userinfoTest", Context.MODE_PRIVATE);
+        SharedPreferences dataInfo = mActivity.getSharedPreferences("userinfo", Context.MODE_PRIVATE);
         final String finalUrl = "javascript:setUserInfo('" + dataInfo.getString("data", "") + "')";
         mWebView.post(() -> mWebView.loadUrl(finalUrl));
     }
 
-    /**
-     * 清空用户信息
-     */
-    @JavascriptInterface
-    public String delUserinfo() {
-        // 清空本地用户信息
-        deleteTags();
-        SharedPreferences.Editor editor = mActivity.getSharedPreferences("userinfoTest", Context.MODE_PRIVATE).edit();
-        editor.putString("data", "");
-        editor.commit();
-        mActivity.startActivity(new Intent(mActivity, MainAty.class));
-        BaseWebAty.baseUrl = "http://114.115.204.49/htAppWeb2";
-        finish();
-        return "success";
-    }
 
-    /**
-     * 用户登录以后通过学校Id以及人员身份设置对应的Tags（标签）
-     *
-     * @param data
-     */
-    public void setTags(String data) {
-//        Set<String> tags = new HashSet<>();
-//        Gson gson = new Gson();
-//        SetTagsBean setTagsBean = gson.fromJson(data, SetTagsBean.class);
-//        tags.add(setTagsBean.getSchoolid());
-//        LogUtils.e(TAG, "getSchoolid   == " + setTagsBean.getSchoolid());
-//        tags.add(setTagsBean.getYhlx());
-//        LogUtils.e(TAG, "getYhlx   == " + setTagsBean.getYhlx());
-//        TagAliasOperatorHelper.TagAliasBean tagAliasBean = new TagAliasOperatorHelper.TagAliasBean();
-//        tagAliasBean.action = ACTION_SET;
-//        sequence++;
-//        tagAliasBean.tags = tags;
-//        TagAliasOperatorHelper.getInstance().handleAction(mActivity.getApplicationContext(), sequence, tagAliasBean);
-    }
-
-    /**
-     * 用户退出登录以后通过学校Id以及人员身份删除对应的Tags（标签）
-     */
-    public void deleteTags() {
-//        Set<String> tags = new HashSet<>();
-//        SharedPreferences dataInfo = mActivity.getSharedPreferences("userinfoTest", Context.MODE_PRIVATE);
-//        String data = dataInfo.getString("data", "");
-//        LogUtils.e(TAG, "data   == " + data);
-//        Gson gson = new Gson();
-//        SetTagsBean setTagsBean = gson.fromJson(data, SetTagsBean.class);
-//        tags.add(setTagsBean.getSchoolid());
-//        tags.add(setTagsBean.getYhlx());
-//        TagAliasOperatorHelper.TagAliasBean tagAliasBean = new TagAliasOperatorHelper.TagAliasBean();
-//        tagAliasBean.action = ACTION_DELETE;
-//        sequence++;
-//        tagAliasBean.tags = tags;
-//        TagAliasOperatorHelper.getInstance().handleAction(mActivity.getApplicationContext(), sequence, tagAliasBean);
-    }
 
     /**
      * 页面跳转
@@ -368,7 +292,7 @@ public class JavascriptInterfaceImpl extends RequestMa {
     public void jumpTo(String jsonStr) {
         LogUtils.e(TAG, "jumpTo     " + jsonStr);
         // 取得本地用户信息
-        SharedPreferences dataInfo = mActivity.getSharedPreferences("userinfoTest", Context.MODE_PRIVATE);
+        SharedPreferences dataInfo = mActivity.getSharedPreferences("userinfo", Context.MODE_PRIVATE);
         String userStr = dataInfo.getString("data", "");
         if (!"".equals(userStr.trim())) {
             // 用户信息不能为空
@@ -381,17 +305,6 @@ public class JavascriptInterfaceImpl extends RequestMa {
             } else {
                 // 参数取得
                 JSONObject info = JSON.parseObject(jsonStr);
-                // 判断是否需要显示悬浮按钮 by3
-//                String by3 = info.getString("by3");
-//                if ("1".equals(by3)) {
-                // 显示悬浮按钮
-//                    MainActivity.isShow = true;
-//                    MainAty.isShow = true;
-//                } else {
-                // 关闭悬浮按钮
-//                    MainActivity.isShow = false;
-//                    MainAty.isShow = false;
-//                }
                 // 页面跳转
                 final String finalUrl = info.getString("url");
                 mWebView.post(() -> mWebView.loadUrl(finalUrl));
@@ -535,150 +448,42 @@ public class JavascriptInterfaceImpl extends RequestMa {
         if (ContextCompat.checkSelfPermission(mActivity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(mActivity, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                mActivity.requestPermissions(new String[]{Manifest.permission.CAMERA, Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.VIBRATE}, PHOTO_REQUEST_SAOYISAO);
+                mActivity.requestPermissions(new String[]{Manifest.permission.CAMERA, Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.VIBRATE}, PHOTO_REQUEST_CAMERA);
             } else {
                 // 权限已经取得的情况下调用
                 // 调用扫一扫
-                Intent intent = new Intent(mActivity, CaptureActivity.class);
-                intent.putExtra(CaptureActivity.KEY_INPUT_MODE, CaptureActivity.INPUT_MODE_QR);
-                mActivity.startActivityForResult(intent, REQUEST_OPEN_QRCODE);
+                scanQrcodeChild();
             }
         } else {
-            Intent intent = new Intent(mActivity, CaptureActivity.class);
-            intent.putExtra(CaptureActivity.KEY_INPUT_MODE, CaptureActivity.INPUT_MODE_QR);
-            mActivity.startActivityForResult(intent, REQUEST_OPEN_QRCODE);
+            scanQrcodeChild();
         }
     }
 
-    /**
-     * 返回上一页
-     */
-    @JavascriptInterface
-    public void finish() {
-        mWebView.post(() -> {
-            // 返回首页
-            if (mActivity instanceof BaseWebAty) {
-                mWebView.loadUrl(((BaseWebAty) mActivity).baseUrl);
-            }
-        });
-    }
-
-    /**
-     * js用弹出通知
-     *
-     * @param tzxxListStr 通知信息数组
-     **/
-    @JavascriptInterface
-    public void callNotification(String tzxxListStr) {
-        // 读取本地文件取得用户信息
-        final SharedPreferences loaclUserinfo = mActivity.getSharedPreferences("userinfoTest", Context.MODE_PRIVATE);
-        // 字符串转数组
-        List<com.alibaba.fastjson.JSONObject> list = JSON.parseArray(tzxxListStr, com.alibaba.fastjson.JSONObject.class);
-        // 循环呼出通知
-        for (com.alibaba.fastjson.JSONObject obj : list) {
-            // id
-            final String id = obj.getString("id");
-            // 标题
-            String bt = obj.getString("bt");
-            // 内容
-            String nr = obj.getString("nr");
-            // 判断系统版本根据版本不一样，通知方法也不一样
-            if (Build.VERSION.SDK_INT >= 26) {
-                // 26及以上版本
-                // 弹出通知信息
-                Intent intent = new Intent(mActivity, MainAty.class);
-                PendingIntent pintent = PendingIntent.getActivity(mActivity, 0, intent, 0);
-                int importance = NotificationManager.IMPORTANCE_LOW;
-                @SuppressLint("WrongConstant") NotificationChannel mChannel = new NotificationChannel("htapp", "htapp", importance);
-                mNotificationManager.createNotificationChannel(mChannel);
-                Notification notification = new Notification.Builder(mActivity, id).setContentTitle("Title")
-                        .setSmallIcon(R.drawable.main_launcher)
-                        .setLargeIcon(BitmapFactory.decodeResource(mActivity.getResources(), R.drawable.main_launcher))
-                        .setContentTitle(bt)
-                        .setContentText(nr)
-                        .setChannelId("htapp")
-                        .setContentIntent(pintent)
-                        .build();
-                mNotificationManager.notify(Integer.valueOf(id), notification);
-                Log.d(TAG, "版本26以上通知发送,id:" + id);
-            } else {
-                // 24及以下版本
-                // 弹出通知信息 todo 测试
-                NotificationCompat.Builder builder = new NotificationCompat.Builder(mActivity)
-                        .setSmallIcon(R.drawable.main_launcher)
-                        .setContentTitle(bt)
-                        .setContentText(nr)
-                        .setDefaults(Notification.DEFAULT_SOUND);
-                Notification notify = builder.build();
-                mNotificationManager.notify(Integer.valueOf(id), notify);
-                Log.d(TAG, "版本24以下通知发送,id:" + id);
-            }
-
-            // TODO okhttp调用
-//			// TODO 更新数据库，确保一条信息只通知一次
-            String url = BaseWebAty.baseUrl + "/saveInformationRead";
-//            HttpRequest.POST(mActivity, url, new Parameter().add("uid", id)
-//                    .add("rybh", loaclUserinfo.getString("uuid", null)).add("flg", "2"), new ResponseListener() {
-//                @Override
-//                public void onResponse(String response, Exception error) {
-//                    if (error == null) {
-//                        LogUtils.e(TAG, "信息发送状态更新成功!");
-//                    } else {
-//                        LogUtils.e(TAG, "通知发送状态更新失败!" + error.toString());
-//                    }
-//                }
-//            });
-//			StringRequest stringRequest = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
-//				@Override
-//				public void onResponse(String response) {
-//					// 更新成功
-//					Log.d(TAG, "信息发送状态更新成功。");
-//				}
-//			}, new Response.ErrorListener() {
-//				@Override
-//				public void onErrorResponse(VolleyError error) {
-//					// 调用异常
-//					LogUtils.e("Volley调用异常", "通知发送状态更新失败:" + error.toString());
-//				}
-//			}) {
-//				/**
-//				 * 返回含有POST或PUT请求的参数的Map
-//				 */
-//				@Override
-//				protected Map<String, String> getParams() throws AuthFailureError {
-//					Map<String, String> paramMap = new HashMap<>();
-//					// 参数设置
-//					// id 信息id
-//					paramMap.put("uid", id);
-//					// uuid 人员uuid
-//					paramMap.put("rybh", loaclUserinfo.getString("uuid", null));
-//					// flg 信息发送状态
-//					paramMap.put("flg", "2");
-//					return paramMap;
-//				}
-//			};
-        }
+    public void scanQrcodeChild() {
+        Intent intent = new Intent(mActivity, CaptureActivity.class);
+        intent.putExtra(CaptureActivity.KEY_INPUT_MODE, CaptureActivity.INPUT_MODE_QR);
+        mActivity.startActivityForResult(intent, REQUEST_OPEN_QRCODE);
     }
 
     /**
      * 取得baidu的图片识别token
      */
-//    @JavascriptInterface
-//    public void getBaiduToken() {
-//        OCR.getInstance(mActivity).initAccessToken(new OnResultListener<AccessToken>() {
-//            @Override
-//            public void onResult(AccessToken accessToken) {
-//                String token = accessToken.getAccessToken();
-//                hasGotToken = true;
-//            }
-//
-//            @Override
-//            public void onError(OCRError error) {
-//                error.printStackTrace();
-//                showToast("licence方式获取token失败" + error.getMessage(), 1);
-//            }
-//        }, mActivity.getApplicationContext());
-//    }
+    @JavascriptInterface
+    public void getBaiduToken() {
+        OCR.getInstance(mActivity).initAccessToken(new OnResultListener<AccessToken>() {
+            @Override
+            public void onResult(AccessToken accessToken) {
+                String token = accessToken.getAccessToken();
+                hasGotToken = true;
+            }
+
+            @Override
+            public void onError(OCRError error) {
+                error.printStackTrace();
+                LogUtils.e(TAG, "licence方式获取token失败" + error.getMessage());
+            }
+        }, mActivity.getApplicationContext());
+    }
 
     private boolean checkTokenStatus() {
         if (!hasGotToken) {
@@ -709,91 +514,91 @@ public class JavascriptInterfaceImpl extends RequestMa {
         }
     }
 
-//    /**
-//     * 身份证识别页面跳转
-//     */
+    /**
+     * 身份证识别页面跳转
+     */
     public void toSfzCamera(String type) {
-//        // 判断是否已取得token
-//        if (!checkTokenStatus()) {
-//            return;
-//        }
-//        //  初始化本地质量控制模型,释放代码在onDestory中
-//        //  调用身份证扫描必须加上 intent.putExtra(HeadCameraActivity.KEY_NATIVE_MANUAL, true); 关闭自动初始化和释放本地模型
-//        CameraNativeHelper.init(mActivity, OCR.getInstance(mActivity).getLicense(),
-//                new CameraNativeHelper.CameraNativeInitCallback() {
-//                    @Override
-//                    public void onError(int errorCode, Throwable e) {
-//                        String msg;
-//                        switch (errorCode) {
-//                            case CameraView.NATIVE_SOLOAD_FAIL:
-//                                msg = "加载so失败，请确保apk中存在ui部分的so";
-//                                break;
-//                            case CameraView.NATIVE_AUTH_FAIL:
-//                                msg = "授权本地质量控制token获取失败";
-//                                break;
-//                            case CameraView.NATIVE_INIT_FAIL:
-//                                msg = "本地质量控制";
-//                                break;
-//                            default:
-//                                msg = String.valueOf(errorCode);
-//                        }
-//                        LogUtils.e(TAG, "onError: 本地质量控制初始化错误，错误原因： " + msg);
-//                    }
-//                });
-//        // 根据type判断
-//        if ("shootSfzA".equals(type)) {
-//            // 身份证正面拍照
-//            Intent intent = new Intent(mActivity, CameraActivity.class);
-//            intent.putExtra(CameraActivity.KEY_OUTPUT_FILE_PATH,
-//                    Utils.getSaveFile(mActivity.getApplication()).getAbsolutePath());
-//            intent.putExtra(CameraActivity.KEY_CONTENT_TYPE, CameraActivity.CONTENT_TYPE_ID_CARD_FRONT);
-//            mActivity.startActivityForResult(intent, REQUEST_CODE_CAMERA);
-//        } else if ("shootSfzB".equals(type)) {
-//            // 身份证反面拍照
-//            Intent intent = new Intent(mActivity, CameraActivity.class);
-//            intent.putExtra(CameraActivity.KEY_OUTPUT_FILE_PATH,
-//                    Utils.getSaveFile(mActivity.getApplication()).getAbsolutePath());
-//            intent.putExtra(CameraActivity.KEY_CONTENT_TYPE, CameraActivity.CONTENT_TYPE_ID_CARD_BACK);
-//            mActivity.startActivityForResult(intent, REQUEST_CODE_CAMERA);
-//        } else if ("scanSfzA".equals(type)) {
-//            // 身份证正面扫描
-//            Intent intent = new Intent(mActivity, CameraActivity.class);
-//            intent.putExtra(CameraActivity.KEY_OUTPUT_FILE_PATH,
-//                    Utils.getSaveFile(mActivity.getApplication()).getAbsolutePath());
-//            intent.putExtra(CameraActivity.KEY_NATIVE_ENABLE,
-//                    true);
-//            // KEY_NATIVE_MANUAL设置了之后CameraActivity中不再自动初始化和释放模型
-//            // 请手动使用CameraNativeHelper初始化和释放模型
-//            // 推荐这样做，可以避免一些activity切换导致的不必要的异常
-//            intent.putExtra(CameraActivity.KEY_NATIVE_MANUAL,
-//                    true);
-//            intent.putExtra(CameraActivity.KEY_CONTENT_TYPE, CameraActivity.CONTENT_TYPE_ID_CARD_FRONT);
-//            mActivity.startActivityForResult(intent, REQUEST_CODE_CAMERA);
-//        } else if ("scanSfzB".equals(type)) {
-//            // 身份证反面扫描
-//            Intent intent = new Intent(mActivity, CameraActivity.class);
-//            intent.putExtra(CameraActivity.KEY_OUTPUT_FILE_PATH,
-//                    Utils.getSaveFile(mActivity.getApplication()).getAbsolutePath());
-//            intent.putExtra(CameraActivity.KEY_NATIVE_ENABLE,
-//                    true);
-//            // KEY_NATIVE_MANUAL设置了之后CameraActivity中不再自动初始化和释放模型
-//            // 请手动使用CameraNativeHelper初始化和释放模型
-//            // 推荐这样做，可以避免一些activity切换导致的不必要的异常
-//            intent.putExtra(CameraActivity.KEY_NATIVE_MANUAL,
-//                    true);
-//            intent.putExtra(CameraActivity.KEY_CONTENT_TYPE, CameraActivity.CONTENT_TYPE_ID_CARD_BACK);
-//            mActivity.startActivityForResult(intent, REQUEST_CODE_CAMERA);
-//        } else {
-//            // type参数有问题
-//            LogUtils.e(TAG, "toSfzCamera: 身份证识别参数有问题。");
-//        }
+        // 判断是否已取得token
+        if (!checkTokenStatus()) {
+            return;
+        }
+        //  初始化本地质量控制模型,释放代码在onDestory中
+        //  调用身份证扫描必须加上 intent.putExtra(HeadCameraActivity.KEY_NATIVE_MANUAL, true); 关闭自动初始化和释放本地模型
+        CameraNativeHelper.init(mActivity, OCR.getInstance(mActivity).getLicense(),
+                new CameraNativeHelper.CameraNativeInitCallback() {
+                    @Override
+                    public void onError(int errorCode, Throwable e) {
+                        String msg;
+                        switch (errorCode) {
+                            case CameraView.NATIVE_SOLOAD_FAIL:
+                                msg = "加载so失败，请确保apk中存在ui部分的so";
+                                break;
+                            case CameraView.NATIVE_AUTH_FAIL:
+                                msg = "授权本地质量控制token获取失败";
+                                break;
+                            case CameraView.NATIVE_INIT_FAIL:
+                                msg = "本地质量控制";
+                                break;
+                            default:
+                                msg = String.valueOf(errorCode);
+                        }
+                        LogUtils.e(TAG, "onError: 本地质量控制初始化错误，错误原因： " + msg);
+                    }
+                });
+        // 根据type判断
+        if ("shootSfzA".equals(type)) {
+            // 身份证正面拍照
+            Intent intent = new Intent(mActivity, CameraActivity.class);
+            intent.putExtra(CameraActivity.KEY_OUTPUT_FILE_PATH,
+                    Utils.getSaveFile(mActivity.getApplication()).getAbsolutePath());
+            intent.putExtra(CameraActivity.KEY_CONTENT_TYPE, CameraActivity.CONTENT_TYPE_ID_CARD_FRONT);
+            mActivity.startActivityForResult(intent, REQUEST_CODE_CAMERA);
+        } else if ("shootSfzB".equals(type)) {
+            // 身份证反面拍照
+            Intent intent = new Intent(mActivity, CameraActivity.class);
+            intent.putExtra(CameraActivity.KEY_OUTPUT_FILE_PATH,
+                    Utils.getSaveFile(mActivity.getApplication()).getAbsolutePath());
+            intent.putExtra(CameraActivity.KEY_CONTENT_TYPE, CameraActivity.CONTENT_TYPE_ID_CARD_BACK);
+            mActivity.startActivityForResult(intent, REQUEST_CODE_CAMERA);
+        } else if ("scanSfzA".equals(type)) {
+            // 身份证正面扫描
+            Intent intent = new Intent(mActivity, CameraActivity.class);
+            intent.putExtra(CameraActivity.KEY_OUTPUT_FILE_PATH,
+                    Utils.getSaveFile(mActivity.getApplication()).getAbsolutePath());
+            intent.putExtra(CameraActivity.KEY_NATIVE_ENABLE,
+                    true);
+            // KEY_NATIVE_MANUAL设置了之后CameraActivity中不再自动初始化和释放模型
+            // 请手动使用CameraNativeHelper初始化和释放模型
+            // 推荐这样做，可以避免一些activity切换导致的不必要的异常
+            intent.putExtra(CameraActivity.KEY_NATIVE_MANUAL,
+                    true);
+            intent.putExtra(CameraActivity.KEY_CONTENT_TYPE, CameraActivity.CONTENT_TYPE_ID_CARD_FRONT);
+            mActivity.startActivityForResult(intent, REQUEST_CODE_CAMERA);
+        } else if ("scanSfzB".equals(type)) {
+            // 身份证反面扫描
+            Intent intent = new Intent(mActivity, CameraActivity.class);
+            intent.putExtra(CameraActivity.KEY_OUTPUT_FILE_PATH,
+                    Utils.getSaveFile(mActivity.getApplication()).getAbsolutePath());
+            intent.putExtra(CameraActivity.KEY_NATIVE_ENABLE,
+                    true);
+            // KEY_NATIVE_MANUAL设置了之后CameraActivity中不再自动初始化和释放模型
+            // 请手动使用CameraNativeHelper初始化和释放模型
+            // 推荐这样做，可以避免一些activity切换导致的不必要的异常
+            intent.putExtra(CameraActivity.KEY_NATIVE_MANUAL,
+                    true);
+            intent.putExtra(CameraActivity.KEY_CONTENT_TYPE, CameraActivity.CONTENT_TYPE_ID_CARD_BACK);
+            mActivity.startActivityForResult(intent, REQUEST_CODE_CAMERA);
+        } else {
+            // type参数有问题
+            LogUtils.e(TAG, "toSfzCamera: 身份证识别参数有问题。");
+        }
     }
 
     /**
      * 银行卡取景框相机调用
      */
     @JavascriptInterface
-    public void yhkCamera() {
+    public void openCameraToBankCard() {
         // 取得相机权限
         if (ContextCompat.checkSelfPermission(mActivity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(mActivity, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
@@ -809,6 +614,18 @@ public class JavascriptInterfaceImpl extends RequestMa {
         }
     }
 
+    public void openCameraToBankCardResult(BankCardResult result) {
+        LogUtils.e(TAG, result.toString());
+        url = "javascript:setCameraToBankCardResult('" + result.getBankName().trim() + "','" + result.getBankCardNumber().trim() + "')";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
+                // nothing
+            }));
+        } else {
+            mWebView.post(() -> mWebView.loadUrl(url));
+        }
+    }
+
     /**
      * 银行卡识别界面呼出
      */
@@ -816,12 +633,12 @@ public class JavascriptInterfaceImpl extends RequestMa {
         if (!checkTokenStatus()) {
             return;
         }
-//        Intent intent = new Intent(mActivity, CameraActivity.class);
-//        intent.putExtra(CameraActivity.KEY_OUTPUT_FILE_PATH,
-//                Utils.getSaveFile(mActivity.getApplication()).getAbsolutePath());
-//        intent.putExtra(CameraActivity.KEY_CONTENT_TYPE,
-//                CameraActivity.CONTENT_TYPE_BANK_CARD);
-//        mActivity.startActivityForResult(intent, REQUEST_CODE_BANKCARD);
+        Intent intent = new Intent(mActivity, CameraActivity.class);
+        intent.putExtra(CameraActivity.KEY_OUTPUT_FILE_PATH,
+                Utils.getSaveFile(mActivity.getApplication()).getAbsolutePath());
+        intent.putExtra(CameraActivity.KEY_CONTENT_TYPE,
+                CameraActivity.CONTENT_TYPE_BANK_CARD);
+        mActivity.startActivityForResult(intent, REQUEST_CODE_BANKCARD);
     }
 
     /**
@@ -851,12 +668,12 @@ public class JavascriptInterfaceImpl extends RequestMa {
         if (!checkTokenStatus()) {
             return;
         }
-//        Intent intent = new Intent(mActivity, CameraActivity.class);
-//        intent.putExtra(CameraActivity.KEY_OUTPUT_FILE_PATH,
-//                Utils.getSaveFile(mActivity.getApplication()).getAbsolutePath());
-//        intent.putExtra(CameraActivity.KEY_CONTENT_TYPE,
-//                CameraActivity.CONTENT_TYPE_GENERAL);
-//        mActivity.startActivityForResult(intent, REQUEST_CODE_RECEIPT);
+        Intent intent = new Intent(mActivity, CameraActivity.class);
+        intent.putExtra(CameraActivity.KEY_OUTPUT_FILE_PATH,
+                Utils.getSaveFile(mActivity.getApplication()).getAbsolutePath());
+        intent.putExtra(CameraActivity.KEY_CONTENT_TYPE,
+                CameraActivity.CONTENT_TYPE_GENERAL);
+        mActivity.startActivityForResult(intent, REQUEST_CODE_RECEIPT);
     }
 
     /**
@@ -869,47 +686,47 @@ public class JavascriptInterfaceImpl extends RequestMa {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 mActivity.requestPermissions(new String[]{Manifest.permission.CAMERA, Manifest.permission.READ_EXTERNAL_STORAGE}, HEADCAMERA_REQUEST);
             } else {
-//                // 设置面部图片保存参数
-//                setFaceDetecetConfig();
-//                Intent intent = new Intent(mActivity, FaceDetectExpActivity.class);
-//                // 跳转采集界面
-//                mActivity.startActivityForResult(intent, REQUEST_CODE_HEADCAMERA);
+                // 设置面部图片保存参数
+                setFaceDetecetConfig();
+                Intent intent = new Intent(mActivity, FaceDetectExpActivity.class);
+                // 跳转采集界面
+                mActivity.startActivityForResult(intent, REQUEST_CODE_HEADCAMERA);
             }
         } else {
-//            // 设置面部图片保存参数
-//            setFaceDetecetConfig();
-//            Intent intent = new Intent(mActivity, FaceDetectExpActivity.class);
-//            // 跳转采集界面
-//            mActivity.startActivityForResult(intent, REQUEST_CODE_HEADCAMERA);
+            // 设置面部图片保存参数
+            setFaceDetecetConfig();
+            Intent intent = new Intent(mActivity, FaceDetectExpActivity.class);
+            // 跳转采集界面
+            mActivity.startActivityForResult(intent, REQUEST_CODE_HEADCAMERA);
         }
     }
 
     private void setFaceDetecetConfig() {
-//        FaceConfig config = FaceSDKManager.getInstance().getFaceConfig();
-//        // SDK初始化已经设置完默认参数（推荐参数），您也根据实际需求进行数值调整
-//        // 模糊度范围
-//        config.setBlurnessValue(FaceEnvironment.VALUE_BLURNESS);
-//        // 光照范围
-//        config.setBrightnessValue(60f);
-//        // 裁剪人脸大小
-//        config.setCropFaceValue(600);
-//        // 人脸角度范围
-//        config.setHeadPitchValue(FaceEnvironment.VALUE_HEAD_PITCH);
-//        config.setHeadRollValue(FaceEnvironment.VALUE_HEAD_ROLL);
-//        config.setHeadYawValue(FaceEnvironment.VALUE_HEAD_YAW);
-//        // 最小检测人脸
-//        config.setMinFaceSize(FaceEnvironment.VALUE_MIN_FACE_SIZE);
-//        //
-//        config.setNotFaceValue(FaceEnvironment.VALUE_NOT_FACE_THRESHOLD);
-//        // 人脸遮挡范围
-//        config.setOcclusionValue(FaceEnvironment.VALUE_OCCLUSION);
-//        // 是否进行适量检测
-//        config.setCheckFaceQuality(true);
-//        // 人脸检测使用线程数
-//        config.setFaceDecodeNumberOfThreads(2);
-//        // 是否开启提示音
-//        config.setSound(true);
-//        FaceSDKManager.getInstance().setFaceConfig(config);
+        FaceConfig config = FaceSDKManager.getInstance().getFaceConfig();
+        // SDK初始化已经设置完默认参数（推荐参数），您也根据实际需求进行数值调整
+        // 模糊度范围
+        config.setBlurnessValue(FaceEnvironment.VALUE_BLURNESS);
+        // 光照范围
+        config.setBrightnessValue(60f);
+        // 裁剪人脸大小
+        config.setCropFaceValue(600);
+        // 人脸角度范围
+        config.setHeadPitchValue(FaceEnvironment.VALUE_HEAD_PITCH);
+        config.setHeadRollValue(FaceEnvironment.VALUE_HEAD_ROLL);
+        config.setHeadYawValue(FaceEnvironment.VALUE_HEAD_YAW);
+        // 最小检测人脸
+        config.setMinFaceSize(FaceEnvironment.VALUE_MIN_FACE_SIZE);
+        //
+        config.setNotFaceValue(FaceEnvironment.VALUE_NOT_FACE_THRESHOLD);
+        // 人脸遮挡范围
+        config.setOcclusionValue(FaceEnvironment.VALUE_OCCLUSION);
+        // 是否进行适量检测
+        config.setCheckFaceQuality(true);
+        // 人脸检测使用线程数
+        config.setFaceDecodeNumberOfThreads(2);
+        // 是否开启提示音
+        config.setSound(true);
+        FaceSDKManager.getInstance().setFaceConfig(config);
     }
 
     /**
@@ -974,59 +791,59 @@ public class JavascriptInterfaceImpl extends RequestMa {
     @JavascriptInterface
     public void faceReg() {
         // 设置参数
-//        setFaceConfig();
-//        // 跳转检测界面
-//        Intent intent = new Intent(mActivity, FaceLivenessExpActivity.class);
-//        mActivity.startActivityForResult(intent, REQUEST_CODE_FACEREG);
+        setFaceConfig();
+        // 跳转检测界面
+        Intent intent = new Intent(mActivity, FaceLivenessExpActivity.class);
+        mActivity.startActivityForResult(intent, REQUEST_CODE_FACEREG);
     }
 
     private void setFaceConfig() {
-//        FaceConfig config = FaceSDKManager.getInstance().getFaceConfig();
-//        // SDK初始化已经设置完默认参数（推荐参数），您也根据实际需求进行数值调整
-//        // 根据需求添加活体动作
-//        BaseApplication.livenessList.clear();
-//        // 眨眼
-//        BaseApplication.livenessList.add(LivenessTypeEnum.Eye);
-////		// 张嘴
-////		Myapplication.livenessList.add(LivenessTypeEnum.Mouth);
-////		// 抬头
-////		Myapplication.livenessList.add(LivenessTypeEnum.HeadUp);
-////		// 低头
-////		Myapplication.livenessList.add(LivenessTypeEnum.HeadDown);
-////		// 左转
-////		Myapplication.livenessList.add(LivenessTypeEnum.HeadLeft);
-////		// 右转
-////		Myapplication.livenessList.add(LivenessTypeEnum.HeadRight);
-////		// 摇头
-////		Myapplication.livenessList.add(LivenessTypeEnum.HeadLeftOrRight);
-//        // 设置活体动作
-//        config.setLivenessTypeList(BaseApplication.livenessList);
-//        // 设置活体动作是否随机
-//        config.setLivenessRandom(BaseApplication.isLivenessRandom);
-//        // 模糊度范围
-//        config.setBlurnessValue(FaceEnvironment.VALUE_BLURNESS);
-//        // 光照范围
-//        config.setBrightnessValue(FaceEnvironment.VALUE_BRIGHTNESS);
-//        // 裁剪人脸大小
-//        config.setCropFaceValue(FaceEnvironment.VALUE_CROP_FACE_SIZE);
-//        // 人脸角度范围
-//        config.setHeadPitchValue(FaceEnvironment.VALUE_HEAD_PITCH);
-//        config.setHeadRollValue(FaceEnvironment.VALUE_HEAD_ROLL);
-//        config.setHeadYawValue(FaceEnvironment.VALUE_HEAD_YAW);
-//        // 最小检测人脸
-//        config.setMinFaceSize(FaceEnvironment.VALUE_MIN_FACE_SIZE);
-//        //
-//        config.setNotFaceValue(FaceEnvironment.VALUE_NOT_FACE_THRESHOLD);
-//        // 人脸遮挡范围
-//        config.setOcclusionValue(FaceEnvironment.VALUE_OCCLUSION);
-//        // 是否进行适量检测
-//        config.setCheckFaceQuality(true);
-//        // 人脸检测使用线程数
-//        config.setFaceDecodeNumberOfThreads(2);
-//        // 是否开启提示音
-//        config.setSound(true);
-//
-//        FaceSDKManager.getInstance().setFaceConfig(config);
+        FaceConfig config = FaceSDKManager.getInstance().getFaceConfig();
+        // SDK初始化已经设置完默认参数（推荐参数），您也根据实际需求进行数值调整
+        // 根据需求添加活体动作
+        BaseApplication.livenessList.clear();
+        // 眨眼
+        BaseApplication.livenessList.add(LivenessTypeEnum.Eye);
+//		// 张嘴
+//		Myapplication.livenessList.add(LivenessTypeEnum.Mouth);
+//		// 抬头
+//		Myapplication.livenessList.add(LivenessTypeEnum.HeadUp);
+//		// 低头
+//		Myapplication.livenessList.add(LivenessTypeEnum.HeadDown);
+//		// 左转
+//		Myapplication.livenessList.add(LivenessTypeEnum.HeadLeft);
+//		// 右转
+//		Myapplication.livenessList.add(LivenessTypeEnum.HeadRight);
+//		// 摇头
+//		Myapplication.livenessList.add(LivenessTypeEnum.HeadLeftOrRight);
+        // 设置活体动作
+        config.setLivenessTypeList(BaseApplication.livenessList);
+        // 设置活体动作是否随机
+        config.setLivenessRandom(BaseApplication.isLivenessRandom);
+        // 模糊度范围
+        config.setBlurnessValue(FaceEnvironment.VALUE_BLURNESS);
+        // 光照范围
+        config.setBrightnessValue(FaceEnvironment.VALUE_BRIGHTNESS);
+        // 裁剪人脸大小
+        config.setCropFaceValue(FaceEnvironment.VALUE_CROP_FACE_SIZE);
+        // 人脸角度范围
+        config.setHeadPitchValue(FaceEnvironment.VALUE_HEAD_PITCH);
+        config.setHeadRollValue(FaceEnvironment.VALUE_HEAD_ROLL);
+        config.setHeadYawValue(FaceEnvironment.VALUE_HEAD_YAW);
+        // 最小检测人脸
+        config.setMinFaceSize(FaceEnvironment.VALUE_MIN_FACE_SIZE);
+        //
+        config.setNotFaceValue(FaceEnvironment.VALUE_NOT_FACE_THRESHOLD);
+        // 人脸遮挡范围
+        config.setOcclusionValue(FaceEnvironment.VALUE_OCCLUSION);
+        // 是否进行适量检测
+        config.setCheckFaceQuality(true);
+        // 人脸检测使用线程数
+        config.setFaceDecodeNumberOfThreads(2);
+        // 是否开启提示音
+        config.setSound(true);
+
+        FaceSDKManager.getInstance().setFaceConfig(config);
     }
 
     /**
@@ -1061,11 +878,21 @@ public class JavascriptInterfaceImpl extends RequestMa {
     @JavascriptInterface
     public void clearCache() {
         mWebView.post(new Runnable() {
+            @SuppressLint("NewApi")
             @Override
             public void run() {
-                mWebView.clearCache(true);
-                Log.d(TAG, "缓存清理成功 ");
-                showToast("缓存清理成功。", 2);
+                try {
+                    mWebView.clearCache(true);
+                    CookieManager cookieManager = CookieManager.getInstance();
+                    cookieManager.removeAllCookies(new ValueCallback<Boolean>() {
+                        @Override
+                        public void onReceiveValue(Boolean value) {
+
+                        }
+                    });
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         });
     }
@@ -1092,7 +919,7 @@ public class JavascriptInterfaceImpl extends RequestMa {
     @JavascriptInterface
     public String saveData(String key, String data) {
         LogUtils.e(TAG, "key" + key + "data" + data);
-        if ("userinfoTest".equals(key)) {
+        if ("userinfo".equals(key)) {
             // 不能跟用户信息冲突
             return "error";
         } else {
@@ -1110,7 +937,7 @@ public class JavascriptInterfaceImpl extends RequestMa {
      */
     @JavascriptInterface
     public void getData(String key) {
-//        if ("userinfoTest".equals(key)) {
+//        if ("userinfo".equals(key)) {
 //            // 不能跟用户信息冲突
 //            return "error";
 //        } else {
@@ -1119,7 +946,7 @@ public class JavascriptInterfaceImpl extends RequestMa {
 //            return dataInfo.getString("data", "");
 //        }
         LogUtils.e(TAG, "key" + key);
-        if ("userinfoTest".equals(key)) {
+        if ("userinfo".equals(key)) {
             // 不能跟用户信息冲突
             url = "javascript:setData('" + key + "','" + "error" + "')";
             // 调用页面方法
@@ -1160,11 +987,63 @@ public class JavascriptInterfaceImpl extends RequestMa {
      * 云证书下载流程
      */
 
+    /**
+     * 报错的提示
+     */
+    private void showLogTo(HKEException e) {
+        String result = e.toString().substring(e.toString().indexOf("]") + 1);
+        showToast(result, 1);
+        LogUtils.e("-->", "原因" + e.toString());
+        org.json.JSONObject jsonObject = new org.json.JSONObject();
+        try {
+            jsonObject.put("state", "0");
+            jsonObject.put("result", result);
+        } catch (JSONException e1) {
+            e1.printStackTrace();
+        }
+        if (loadDialog != null) {
+            loadDialog.dismiss();
+        }
+        url = "javascript:signMessageWithBusinessMessage_callBack('" + jsonObject.toString() + "')";
+//                LogUtils.e(TAG,jsonObject.toString());
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
+                // nothing
+            }));
+        } else {
+            mWebView.post(() -> mWebView.loadUrl(url));
+        }
+    }
 
     /**
      * dbb  获取服务器随机数
      */
     public void getCFCA(String json) {
+        LogUtils.e(TAG, json);
+        cfcaJson = json;
+        SharedPreferences dataInfo = mActivity.getSharedPreferences("userinfo", Context.MODE_PRIVATE);
+        String userStr = dataInfo.getString("data", "");
+        if (!"".equals(userStr.trim())) {
+            // 用户信息不能为空
+            JSONObject user = JSON.parseObject(userStr);
+            if (user.getString("yztUrl") != null) {
+                yztUrl = user.getString("yztUrl");
+            }
+        }
+        if (yztUrl == null || yztUrl.equals("") || yztUrl.equals("null")) {
+            showToast("当前没配置云证通服务地址", 1);
+            loadDialog.dismiss();
+            url = "javascript:cancel_loading()";
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
+                    // nothing
+                }));
+            } else {
+                mWebView.post(() -> mWebView.loadUrl(url));
+            }
+            return;
+        }
+//        LogUtils.e(TAG,json);
         // 取得获取设备唯一标识权限
         if (ContextCompat.checkSelfPermission(mActivity, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -1191,33 +1070,13 @@ public class JavascriptInterfaceImpl extends RequestMa {
                         }
                         requestUserAuthAsync(s1, usersInfo.getIdType(), usersInfo.getIdNo(), usersInfo.getPhoneNo());
                         LogUtils.e("获取到随机数  ", "随机数为-->" + s1 + "<--");
-                        // 调用页面方法
-//                        url = "javascript:setCFCAResult('" + s1 + "')";
-//                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-//                            mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
-//                                // nothing
-//                            }));
-//                        } else {
-//                            mWebView.post(() -> mWebView.loadUrl(url));
-//                        }
                     }
 
                     @SuppressLint("ObsoleteSdkInt")
                     @Override
                     public void onError(HKEException e) {
                         loadDialog.dismiss();
-                        LogUtils.e("获取失败", "HKEException-->" + e.toString() + "<--");
-                        String result = "获取失败！";
-//                        url = "javascript:setCFCAResult('" + result + "')";
-                        // 调用页面方法
-//                        final String finalUrl = url;
-//                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-//                            mWebView.post(() -> mWebView.evaluateJavascript(finalUrl, s -> {
-//                                // nothing
-//                            }));
-//                        } else {
-//                            mWebView.post(() -> mWebView.loadUrl(finalUrl));
-//                        }
+                        showLogTo(e);
                     }
                 });
     }
@@ -1237,9 +1096,9 @@ public class JavascriptInterfaceImpl extends RequestMa {
         envelope.bodyOut = request;//由于是发送请求，所以是设置bodyOut
         envelope.dotNet = false;//由于是.net开发的webservice，所以这里要设置为true
         envelope.setOutputSoapObject(request);
-        HttpTransportSE httpTransportSE = new HttpTransportSE(WSDL_URI);
+        HttpTransportSE httpTransportSE = new HttpTransportSE(yztUrl);
         try {
-            httpTransportSE.call(soapUserAction, envelope);//调用
+            httpTransportSE.call(yztUrl + soapUserAction, envelope);//调用
         } catch (IOException e) {
             e.printStackTrace();
         } catch (XmlPullParserException e) {
@@ -1294,9 +1153,9 @@ public class JavascriptInterfaceImpl extends RequestMa {
         envelope.bodyOut = request;//由于是发送请求，所以是设置bodyOut
         envelope.dotNet = false;//由于是.net开发的webservice，所以这里要设置为true
         envelope.setOutputSoapObject(request);
-        HttpTransportSE httpTransportSE = new HttpTransportSE(WSDL_URI);
+        HttpTransportSE httpTransportSE = new HttpTransportSE(yztUrl);
         try {
-            httpTransportSE.call(soapP1Action, envelope);//调用
+            httpTransportSE.call(yztUrl + soapP1Action, envelope);//调用
         } catch (IOException e) {
             e.printStackTrace();
         } catch (XmlPullParserException e) {
@@ -1347,137 +1206,198 @@ public class JavascriptInterfaceImpl extends RequestMa {
             @Override
             public void onResult(AuthenticateInfo authenticateInfo) {
                 LogUtils.e(TAG, "authenticateWithServerSignature" + authenticateInfo.toString());
-                if (authenticateInfo.getCertificates().size() == 0) {
-                    loadDialog.dismiss();
-                    SweetAlertDialog s = new SweetAlertDialog(mActivity, SweetAlertDialog.WARNING_TYPE);
-                    s.setContentText("您尚未下载证书，是否现在下载？")
-                            .setCancelText("取消")
-                            .setConfirmText("确定")
-                            .showCancelButton(true)
-                            .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
-                                @Override
-                                public void onClick(SweetAlertDialog sweetAlertDialog) {
-                                    sweetAlertDialog.dismiss();
-                                    SweetAlertDialog sweetAlertDialog1 = new SweetAlertDialog(mActivity, PROGRESS_TYPE);
-                                    sweetAlertDialog1
-                                            .setContentText("正在下载证书,请稍后...")
-                                            .showCancelButton(true).show();
-                                    hkeWithPasswordApi.downloadCertificate(new Callback<CFCACertificate>() {
-                                        @Override
-                                        public void onResult(CFCACertificate cfcaCertificate) {
-                                            sweetAlertDialog1.dismiss();
-                                            SweetAlertDialog s = new SweetAlertDialog(mActivity, SweetAlertDialog.SUCCESS_TYPE);
-                                            s.setContentText("下载证书成功!")
-                                                    .setConfirmText("确定")
-                                                    .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
-                                                        @Override
-                                                        public void onClick(SweetAlertDialog sweetAlertDialog) {
-                                                            sweetAlertDialog.dismiss();
-                                                            url = "javascript:cancel_loading()";
-                                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                                                                mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
-                                                                    // nothing
-                                                                }));
-                                                            } else {
-                                                                mWebView.post(() -> mWebView.loadUrl(url));
-                                                            }
-                                                        }
-                                                    })
-                                                    .show();
-                                            String Base64 = cfcaCertificate.getContentBase64();
-                                            String CN = cfcaCertificate.getSubjectCN();
-                                            String DN = cfcaCertificate.getSubjectDN();
-                                            LogUtils.e("HKE", "Base64  -->" + Base64);
-                                            LogUtils.e("HKE", "CN  -->" + CN);
-                                            LogUtils.e("HKE", "DN:  -->" + DN);
-                                            LogUtils.e("HKE", "证书类型1 -->" + cfcaCertificate.getCert().toString());
-                                        }
-
-                                        @Override
-                                        public void onError(HKEException e) {
-                                            sweetAlertDialog1.dismiss();
-                                            LogUtils.e("HKE  -->", "证书下载失败");
-                                        }
-                                    });
-                                }
-                            })
-                            .setCancelClickListener(new SweetAlertDialog.OnSweetClickListener() {
-                                @Override
-                                public void onClick(SweetAlertDialog sDialog) {
-                                    sDialog.dismiss();
-                                    url = "javascript:cancel_loading()";
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                                        mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
-                                            // nothing
-                                        }));
-                                    } else {
-                                        mWebView.post(() -> mWebView.loadUrl(url));
-                                    }
-                                }
-                            })
-                            .show();
-                } else {
-                    CFCACertificate cfcaCertificate = authenticateInfo.getCertificates().get(0);
-                    LogUtils.e("HKE  -->", "证书KEY -->" + cfcaCertificate.getKeyUsage().toString());
-                    LogUtils.e("HKE  -->", "证书类型 1-->" + cfcaCertificate.getCert().toString());
-                    if (authenticateInfo.getPinState() == 0) {
-                        loadDialog.dismiss();
-
-//                        requestJsonAsync(businessText, "", "");   无PIN码签名
-                    } else if (authenticateInfo.getPinState() == 1) {
-                        loadDialog.dismiss();
-                        SweetAlertDialog s = new SweetAlertDialog(mActivity, SweetAlertDialog.WARNING_TYPE);
-                        s.setContentText("您尚未设置PIN码，是否现在设置？")
-                                .setCancelText("取消")
-                                .setConfirmText("确定")
-                                .showCancelButton(true)
-                                .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
-                                    @Override
-                                    public void onClick(SweetAlertDialog sweetAlertDialog) {
-                                        sweetAlertDialog.dismiss();
-                                        Intent intent = new Intent(mActivity, InputPasswordAty.class);
-                                        intent.putExtra("random", authenticateInfo.getPinServerRandom());
-                                        mActivity.startActivityForResult(intent, REQUEST_PIN);
-                                    }
-                                })
-                                .setCancelClickListener(new SweetAlertDialog.OnSweetClickListener() {
-                                    @Override
-                                    public void onClick(SweetAlertDialog sweetAlertDialog) {
-                                        sweetAlertDialog.dismiss();
-                                        url = "javascript:cancel_loading()";
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                                            mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
-                                                // nothing
-                                            }));
-                                        } else {
-                                            mWebView.post(() -> mWebView.loadUrl(url));
-                                        }
-                                    }
-                                })
-                                .show();
-                    } else if (authenticateInfo.getPinState() == 2) {
-                        if (isUpdatePIN) {
-                            loadDialog.dismiss();
-                            Intent intent = new Intent(mActivity, UpdatePINAty.class);
-                            intent.putExtra("random", authenticateInfo.getPinServerRandom());
-                            mActivity.startActivityForResult(intent, REQUEST_UPDATE_PIN);
-                        } else {
-                            loadDialog.dismiss();
-                            Intent intent = new Intent(mActivity, CheckPasswordAty.class);
-                            intent.putExtra("random", authenticateInfo.getPinServerRandom());
-                            mActivity.startActivityForResult(intent, REQUEST_CHECK_PIN);
-                        }
-                    }
+                //0
+                int typeNumber = authenticateInfo.getNoCertificateReasonCode();
+                String contentText = "";
+                switch (typeNumber) {
+                    case 0:  //本地有证书
+                        have(authenticateInfo);
+                        break;
+                    case 1:  //本地未下载证书
+                        contentText = "您尚未下载证书，是否现在下载？";
+                        notHava(contentText);
+                        break;
+                    case 2:  //本地证书过期被删除
+                        contentText = "您本地证书过期被删除，是否重新下载？";
+                        notHava(contentText);
+                        break;
+                    case 3:  //本地证书文件被改变导致安全监测失败被删除
+                        contentText = "您本地证书文件被改变导致安全监测失败被删除，是否重新下载？";
+                        notHava(contentText);
+                        break;
+                    default:
                 }
             }
 
             @Override
             public void onError(HKEException e) {
                 loadDialog.dismiss();
-                LogUtils.e("身份认证失败  -->", "原因" + e.toString());
+                showLogTo(e);
             }
         });
 
+    }
+
+    /**
+     * 本地有证书操作
+     */
+    public void have(AuthenticateInfo authenticateInfo) {
+        CFCACertificate cfcaCertificate = authenticateInfo.getCertificates().get(0);
+        LogUtils.e("HKE  -->", "证书KEY -->" + cfcaCertificate.getKeyUsage().toString());
+        LogUtils.e("HKE  -->", "证书类型 1-->" + cfcaCertificate.getCert().toString());
+        if (authenticateInfo.getPinState() == 0) {
+            loadDialog.dismiss();
+
+//                        requestJsonAsync(businessText, "", "");   无PIN码签名
+        } else if (authenticateInfo.getPinState() == 1) {
+            loadDialog.dismiss();
+            SweetAlertDialog s = new SweetAlertDialog(mActivity, SweetAlertDialog.WARNING_TYPE);
+//            s.setTitleVisibility(View.GONE);
+            s.setContentText("您尚未设置PIN码，是否现在设置？")
+                    .setCancelText("取消")
+                    .setConfirmText("确定")
+                    .showCancelButton(true)
+                    .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
+                        @Override
+                        public void onClick(SweetAlertDialog sweetAlertDialog) {
+                            sweetAlertDialog.dismiss();
+                            Intent intent = new Intent(mActivity, InputPasswordAty.class);
+                            intent.putExtra("random", authenticateInfo.getPinServerRandom());
+                            mActivity.startActivityForResult(intent, REQUEST_PIN);
+                        }
+                    })
+                    .setCancelClickListener(new SweetAlertDialog.OnSweetClickListener() {
+                        @Override
+                        public void onClick(SweetAlertDialog sweetAlertDialog) {
+                            sweetAlertDialog.dismiss();
+                            url = "javascript:cancel_loading()";
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                                mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
+                                    // nothing
+                                }));
+                            } else {
+                                mWebView.post(() -> mWebView.loadUrl(url));
+                            }
+                        }
+                    })
+                    .show();
+        } else if (authenticateInfo.getPinState() == 2) {
+            if (isUpdatePIN) {
+                loadDialog.dismiss();
+                Intent intent = new Intent(mActivity, UpdatePINAty.class);
+                intent.putExtra("random", authenticateInfo.getPinServerRandom());
+                mActivity.startActivityForResult(intent, REQUEST_UPDATE_PIN);
+            } else {
+                loadDialog.dismiss();
+                Intent intent = new Intent(mActivity, CheckPasswordAty.class);
+                intent.putExtra("random", authenticateInfo.getPinServerRandom());
+                mActivity.startActivityForResult(intent, REQUEST_CHECK_PIN);
+            }
+        }
+    }
+
+    /**
+     * 本地没有证书操作
+     */
+    public void notHava(String contentText) {
+        loadDialog.dismiss();
+        SweetAlertDialog s = new SweetAlertDialog(mActivity, SweetAlertDialog.WARNING_TYPE);
+//        s.setTitleVisibility(View.GONE);
+        s.setContentText(contentText)
+                .setCancelText("取消")
+                .setConfirmText("确定")
+                .showCancelButton(true)
+                .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
+                    @Override
+                    public void onClick(SweetAlertDialog sweetAlertDialog) {
+                        sweetAlertDialog.dismiss();
+                        SweetAlertDialog sweetAlertDialog1 = new SweetAlertDialog(mActivity, PROGRESS_TYPE);
+//                        sweetAlertDialog1.setTitleVisibility(View.GONE);
+                        sweetAlertDialog1
+                                .setContentText("正在下载证书,请稍后...")
+                                .showCancelButton(true).show();
+                        hkeWithPasswordApi.downloadCertificate(new Callback<CFCACertificate>() {
+                            @Override
+                            public void onResult(CFCACertificate cfcaCertificate) {
+                                cfcaCertificate.getNotAfter();//TODO
+                                sweetAlertDialog1.dismiss();
+                                url = "javascript:cancel_loading()";
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                                    mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
+                                        // nothing
+                                    }));
+                                } else {
+                                    mWebView.post(() -> mWebView.loadUrl(url));
+                                }
+                                SweetAlertDialog s = new SweetAlertDialog(mActivity, SweetAlertDialog.SUCCESS_TYPE);
+//                                s.setTitleVisibility(View.GONE);
+                                s.setContentText("下载证书成功!")
+                                        .setConfirmText("确定")
+                                        .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
+                                            @Override
+                                            public void onClick(SweetAlertDialog sweetAlertDialog) {
+                                                sweetAlertDialog.dismiss();
+                                                Gson gson = new Gson();
+                                                UsersInfo usersInfo = gson.fromJson(cfcaJson, UsersInfo.class);
+                                                SimpleDateFormat format = new SimpleDateFormat("EEE MMM dd HH:mm:ss zzz yyyy", Locale.US);
+                                                Date date = null;
+                                                Date date1 = null;
+                                                try {
+                                                    date = format.parse(cfcaCertificate.getNotAfter().toString());
+                                                    date1 = format.parse(cfcaCertificate.getNotBefore().toString());
+                                                } catch (ParseException e) {
+                                                    e.printStackTrace();
+                                                }
+                                                usersInfo.setNotAfter(String.valueOf(date.getTime()));
+                                                usersInfo.setNotBefore(String.valueOf(date1.getTime()));
+                                                String json = usersInfo.toString();
+                                                LogUtils.e(TAG, json);
+                                                url = "javascript:setDN('" + json + "')";
+                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                                                    mWebView.post(() -> mWebView.evaluateJavascript(url, new ValueCallback<String>() {
+                                                        @Override
+                                                        public void onReceiveValue(String s) {
+                                                            LogUtils.e(TAG, s);
+                                                        }
+                                                    }));
+                                                } else {
+                                                    mWebView.post(() -> mWebView.loadUrl(url));
+                                                }
+                                            }
+                                        })
+                                        .show();
+                                String Base64 = cfcaCertificate.getContentBase64();
+                                String CN = cfcaCertificate.getSubjectCN();
+                                String DN = cfcaCertificate.getSubjectDN();
+                                LogUtils.e("HKE", "Base64  -->" + Base64);
+                                LogUtils.e("HKE", "CN  -->" + CN);
+                                LogUtils.e("HKE", "DN:  -->" + DN);
+                                LogUtils.e("HKE", "证书类型1 -->" + cfcaCertificate.getCert().toString());
+                            }
+
+                            @Override
+                            public void onError(HKEException e) {
+                                sweetAlertDialog1.dismiss();
+                                showLogTo(e);
+                            }
+                        });
+                    }
+                })
+                .setCancelClickListener(new SweetAlertDialog.OnSweetClickListener() {
+                    @Override
+                    public void onClick(SweetAlertDialog sDialog) {
+                        sDialog.dismiss();
+                        url = "javascript:cancel_loading()";
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                            mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
+                                // nothing
+                            }));
+                        } else {
+                            mWebView.post(() -> mWebView.loadUrl(url));
+                        }
+                    }
+                })
+                .show();
     }
 
     /**
@@ -1502,6 +1422,7 @@ public class JavascriptInterfaceImpl extends RequestMa {
                     loadDialog.dismiss();
                 }
                 url = "javascript:signMessageWithBusinessMessage_callBack('" + jsonObject.toString() + "')";
+//                LogUtils.e(TAG,jsonObject.toString());
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                     mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
                         // nothing
@@ -1629,9 +1550,9 @@ public class JavascriptInterfaceImpl extends RequestMa {
         envelope.bodyOut = request;//由于是发送请求，所以是设置bodyOut
         envelope.dotNet = false;//由于是.net开发的webservice，所以这里要设置为true
         envelope.setOutputSoapObject(request);
-        HttpTransportSE httpTransportSE = new HttpTransportSE(WSDL_URI);
+        HttpTransportSE httpTransportSE = new HttpTransportSE(yztUrl);
         try {
-            httpTransportSE.call(soapP7Action, envelope);//调用
+            httpTransportSE.call(yztUrl + soapP7Action, envelope);//调用
         } catch (IOException e) {
             e.printStackTrace();
         } catch (XmlPullParserException e) {
@@ -1658,6 +1579,7 @@ public class JavascriptInterfaceImpl extends RequestMa {
     public void setSignMethod(String password, String random) {
         if (!("").equals(password) && !("").equals(random)) {
             loadDialog = new SweetAlertDialog(mActivity, PROGRESS_TYPE);
+//            loadDialog.setTitleVisibility(View.GONE);
             loadDialog.setContentText("请稍候...").show();
             new AsyncTask<String, Integer, String>() {
                 @Override
@@ -1688,7 +1610,6 @@ public class JavascriptInterfaceImpl extends RequestMa {
                 mWebView.post(() -> mWebView.loadUrl(url));
             }
         }
-
     }
 
     /**
@@ -1704,7 +1625,6 @@ public class JavascriptInterfaceImpl extends RequestMa {
         } else {
             mWebView.post(() -> mWebView.loadUrl(url));
         }
-
     }
 
     /**
@@ -1731,7 +1651,9 @@ public class JavascriptInterfaceImpl extends RequestMa {
      */
     @JavascriptInterface
     public void downloadCFCA(String json) {
-//        mWebView.post(() -> mWebView.loadUrl("http://114.115.181.185:8080/htAppWeb2"));
+//        openCameraPhoto();
+//        openCameraToBankCard();
+//        mWebView.post(() -> mWebView.loadUrl("http://192.168.100.223:8080/UAP/Public/Login_IOS.html"));
 //        openFile();
 //        openPhotoAlbum();
         Intent intent = new Intent(mActivity, TestWebViewAty.class);
@@ -1757,35 +1679,13 @@ public class JavascriptInterfaceImpl extends RequestMa {
         }
     }
 
-    public void openFileAlbumResult(String fliePath, String fileName) {
-        LogUtils.e(TAG, "名字：" + fileName + "路径：" + fliePath);
-//        photoList.addAll(mList);
-//        List<String> baseList = new ArrayList<>();
-//        for (int i = 0; i < mList.size(); i++) {
-//            try {
-//                baseList.add(FileUtil.imageToBase64(mList.get(i)));
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//            }
-//        }
-//        Gson g = new Gson();
-//        String json = g.toJson(baseList);
-//        url = "javascript:getFileResult('" + json + "')";
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
-                // nothing
-            }));
-        } else {
-            mWebView.post(() -> mWebView.loadUrl(url));
-        }
-    }
-
     /**
      * dbb  修改PIN码
      */
     @JavascriptInterface
     public void changePassword(String json) {
         loadDialog = new SweetAlertDialog(mActivity, PROGRESS_TYPE);
+//        loadDialog.setTitleVisibility(View.GONE);
         loadDialog.setContentText("请稍候...").show();
         isUpdatePIN = true;
         getCFCA(json);
@@ -1797,6 +1697,7 @@ public class JavascriptInterfaceImpl extends RequestMa {
     @JavascriptInterface
     public void signMessageWithBusinessMessage(String json) {
         loadDialog = new SweetAlertDialog(mActivity, PROGRESS_TYPE);
+//        loadDialog.setTitleVisibility(View.GONE);
         loadDialog.setContentText("请稍候...").show();
         isUpdatePIN = false;
         getCFCA(json);
@@ -1826,7 +1727,6 @@ public class JavascriptInterfaceImpl extends RequestMa {
         loadDialog.dismiss();
     }
 
-
     /**
      * 调用扫一扫
      */
@@ -1839,16 +1739,18 @@ public class JavascriptInterfaceImpl extends RequestMa {
                 mActivity.requestPermissions(new String[]{Manifest.permission.CAMERA, Manifest.permission.READ_EXTERNAL_STORAGE}, OPEN_CAMERA_QRCODE);
             } else {
                 // 调用扫一扫
-                Intent intent = new Intent(mActivity, CaptureActivity.class);
-                intent.putExtra(CaptureActivity.KEY_INPUT_MODE, CaptureActivity.INPUT_MODE_QR);
-                mActivity.startActivityForResult(intent, REQUEST_OPEN_QRCODE);
+                openCameraQRcodeChild();
             }
         } else {
             // 权限已经取得的情况下调用
-            Intent intent = new Intent(mActivity, CaptureActivity.class);
-            intent.putExtra(CaptureActivity.KEY_INPUT_MODE, CaptureActivity.INPUT_MODE_QR);
-            mActivity.startActivityForResult(intent, REQUEST_OPEN_QRCODE);
+            openCameraQRcodeChild();
         }
+    }
+
+    public void openCameraQRcodeChild() {
+        Intent intent = new Intent(mActivity, CaptureActivity.class);
+        intent.putExtra(CaptureActivity.KEY_INPUT_MODE, CaptureActivity.INPUT_MODE_QR);
+        mActivity.startActivityForResult(intent, REQUEST_OPEN_QRCODE);
     }
 
     /**
@@ -1861,87 +1763,92 @@ public class JavascriptInterfaceImpl extends RequestMa {
         LogUtils.e(TAG, "我进来了delPhoto");
     }
 
+    private boolean isFirstOpenPhotoAlbum = true;
+
     @JavascriptInterface
     public void openPhotoAlbum() {
+        isFirstOpenPhotoAlbum = true;
         if (ContextCompat.checkSelfPermission(mActivity, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(mActivity, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 mActivity.requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE}, OPEN_PHOTO_ALBUM);
             } else {
-                // 打开相册
-                Matisse.from(mActivity)
-                        .choose(MimeType.ofImage())
-                        .countable(true)
-                        .maxSelectable(9)
-                        .restrictOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
-                        .thumbnailScale(0.85f)
-                        .theme(R.style.Matisse_Zhihu)
-                        .imageEngine(new Glide4Engine())
-                        .forResult(OPEN_PHOTO_ALBUM);
+                openPhotoAlbumChild();
             }
         } else {
-            // 打开相册
-            Matisse.from(mActivity)
-                    .choose(MimeType.ofImage())
-                    .countable(true)
-                    .maxSelectable(9)
-                    .restrictOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
-                    .thumbnailScale(0.85f)
-                    .theme(R.style.Matisse_Zhihu)
-                    .imageEngine(new Glide4Engine())
-                    .forResult(OPEN_PHOTO_ALBUM);
+            openPhotoAlbumChild();
+        }
+    }
+
+    public void openPhotoAlbumChild() {
+        // 打开相册
+        Matisse.from(mActivity)
+                .choose(MimeType.ofImage())
+                .countable(true)
+                .capture(true)  // 开启相机，和 captureStrategy 一并使用否则报错
+                .captureStrategy(new CaptureStrategy(true, "com.szht.htappfuture")) // 拍照的图片路径
+                .maxSelectable(9)
+                .restrictOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+                .thumbnailScale(0.85f)
+                .theme(R.style.Matisse_Zhihu)
+                .imageEngine(new Glide4Engine())
+                .forResult(OPEN_PHOTO_ALBUM);
+    }
+
+    public void openPhotoAlbum2() {
+        isFirstOpenPhotoAlbum = false;
+        if (ContextCompat.checkSelfPermission(mActivity, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(mActivity, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                mActivity.requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE}, OPEN_PHOTO_ALBUM);
+            } else {
+                openPhotoAlbumChild();
+            }
+        } else {
+            openPhotoAlbumChild();
         }
 
     }
 
-    public void openPhotoAlbumResult(List<String> mList) {
-//        photoList.clear();
-//        photoList.addAll(mList);
-        loadDialog = new SweetAlertDialog(mActivity, PROGRESS_TYPE);
-        loadDialog.setContentText("请稍候...").show();
+    /**
+     * 开启新线程压缩图片
+     */
+    @SuppressLint("StaticFieldLeak")
+    public void resultNewTh(List<String> mList) {
         List<String> baseList = new ArrayList<>();
-//        for (int i = 0; i < mList.size(); i++) {
-//            baseList.add(FileUtil.bitmapToJpegBase64(BitmapFactory.decodeFile(mList.get(i)),100));
-//        }
-//        Gson g = new Gson();
-//        String json = g.toJson(baseList);
-//        loadDialog.dismiss();
-//        url = "javascript:getPhotoAlbum('" + json + "')";
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-//            mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
-//                // nothing
-//            }));
-//        } else {
-//            mWebView.post(() -> mWebView.loadUrl(url));
-//        }
-
-        List<ImageConfig> imgList = new ArrayList<>();
-        for (int i = 0; i < mList.size(); i++) {
-            imgList.add(ImageConfig.getDefaultConfig(mList.get(i)));
-        }
-
-        CompressImageTask.get().compressImages(mActivity,imgList , new CompressImageTask.OnImagesResult() {
+        List<File> fileList = new ArrayList<>();
+        new AsyncTask<String, Integer, String>() {
             @Override
-            public void startCompress() {
-                //压缩前可以选择加载LoadingView
+            protected String doInBackground(String... strings) {
+//                PictureProcessor pictureProcessor = new PictureProcessor("");
+//                String filePath = mActivity.getExternalFilesDir(Environment.DIRECTORY_DCIM).getPath() +
+//                        File.separator;
+//                for (int i = 0; i < mList.size(); i++) {
+//                    fileList.add(pictureProcessor.compress(new File(mList.get(i)), filePath, 500));
+//                }
+                return null;
             }
+
             @Override
-            public void resultFilesSucceed(List<File> fileList) {
+            protected void onPostExecute(String s1) {
                 for (int i = 0; i < fileList.size(); i++) {
                     try {
-//                        baseList.add(FileUtil.encodeBase64File(fileList.get(i)));
-                        baseList.add(FileUtil.bitmapToJpegBase64(BitmapFactory.decodeFile(fileList.get(i).getPath()),100));
+                        baseList.add(FileUtil.bitmapToJpegBase64(BitmapFactory.decodeFile(fileList.get(i).getPath()), 100));
                     } catch (Exception e) {
                         e.printStackTrace();
                         loadDialog.dismiss();
-                        showToast("图片加密失败！",1);
+                        showToast("图片加密失败！", 1);
                     }
-                    LogUtils.e(TAG,"当前压缩文件的大小"+fileList.get(i).length()/1024+"kb");
+                    LogUtils.e(TAG, "当前压缩文件的大小" + fileList.get(i).length() / 1024 + "kb");
                 }
                 Gson g = new Gson();
                 String json = g.toJson(baseList);
                 loadDialog.dismiss();
-                url = "javascript:getPhotoAlbum('" + json + "')";
+                if (isFirstOpenPhotoAlbum) {
+                    url = "javascript:getPhotoAlbum('" + json + "')";
+                } else {
+                    url = "javascript:getPhotoAlbum('" + "photo" + "','" + json + "')";
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                     mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
                         // nothing
@@ -1949,15 +1856,16 @@ public class JavascriptInterfaceImpl extends RequestMa {
                 } else {
                     mWebView.post(() -> mWebView.loadUrl(url));
                 }
+                super.onPostExecute(s1);
             }
+        }.execute();
+    }
 
-            @Override
-            public void resultFilesError() {
-                //失败回调
-                loadDialog.dismiss();
-                showToast("图片压缩失败！",1);
-            }
-        });
+    public void openPhotoAlbumResult(List<String> mList) {
+        loadDialog = new SweetAlertDialog(mActivity, PROGRESS_TYPE);
+//        loadDialog.setTitleVisibility(View.GONE);
+        loadDialog.setContentText("请稍候...").show();
+        resultNewTh(mList);
     }
 
     /**
@@ -1969,4 +1877,308 @@ public class JavascriptInterfaceImpl extends RequestMa {
         mWebView.post(() -> mWebView.loadUrl("file:///android_asset/pdfjs/web/viewer.html?file=" + pdfUrl));
     }
 
+    /**
+     * 打开上传菜单
+     */
+    @JavascriptInterface
+    public void openUploadMenu(String data) {
+        LogUtils.e(TAG, data);
+        Gson gson = new Gson();
+        UploadMenu uploadMenu = gson.fromJson(data, UploadMenu.class);
+        List<MenuItem> menuList = new ArrayList<>();
+        if (uploadMenu.getPhoto().equals("1")) {
+            menuList.add(new MenuItem("拍照"));
+        }
+        if (uploadMenu.getAlbum().equals("1")) {
+            menuList.add(new MenuItem("打开相册"));
+        }
+        if (uploadMenu.getAttachments().equals("1")) {
+            menuList.add(new MenuItem("选择文件"));
+        }
+        if (menuList.size() != 0) {
+            BottomMenuFragment bottomMenuFragment = new BottomMenuFragment(mActivity);
+            bottomMenuFragment.addMenuItems(menuList);
+            bottomMenuFragment.setOnItemClickListener(new BottomMenuFragment.OnItemClickListener() {
+                @Override
+                public void onItemClick(TextView menu_item, int position) {
+                    String str = menu_item.getText().toString().trim();
+                    if (str.equals("拍照")) {
+                        openCamera();
+                    } else if (str.equals("打开相册")) {
+                        openPhotoAlbum2();
+                    } else if (str.equals("选择文件")) {
+                        openDocument();
+                    }
+                }
+            })
+                    .show();
+        }
+    }
+
+    public void openDocument() {
+        if (ContextCompat.checkSelfPermission(mActivity, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(mActivity, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                mActivity.requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE}, REQUEST_OPEN_DOCUMENT);
+            } else {
+                openDocumentChild();
+            }
+        } else {
+            openDocumentChild();
+        }
+    }
+
+    public void openDocumentChild() {
+        Intent intent = new Intent(mActivity, FolderAty.class);
+        mActivity.startActivityForResult(intent, OPEN_DOCUMENT);
+    }
+
+    public void openDocumentResult() {
+        url = "javascript:getPhotoAlbum('" + "attachments" + "','" + BaseApplication.documentBase64 + "')";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
+                // nothing
+            }));
+        } else {
+            mWebView.post(() -> mWebView.loadUrl(url));
+        }
+    }
+
+    public File cameraSavePath;//拍照照片路径
+    private Uri uri;//照片uri
+
+    public void openCamera() {
+        isFirstOpenPhotoAlbum = false;
+        if (ContextCompat.checkSelfPermission(mActivity, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(mActivity, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(mActivity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                mActivity.requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.CAMERA}, OPEN_REQUEST_CAMERA);
+            } else {
+                openCameraChild();
+            }
+        } else {
+            openCameraChild();
+        }
+    }
+
+    public void openCameraChild() {
+        cameraSavePath = new File(Environment.getExternalStorageDirectory().getPath() + "/" + System.currentTimeMillis() + ".jpg");
+        if (mActivity instanceof MainAty) {
+            ((MainAty) mActivity).saveCameraSavePath1 = cameraSavePath;
+        }
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            //第二个参数为 包名.fileprovider
+            uri = FileProvider.getUriForFile(mActivity, "com.szht.htappfuture", cameraSavePath);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } else {
+            uri = Uri.fromFile(cameraSavePath);
+        }
+        intent.putExtra(MediaStore.EXTRA_OUTPUT, uri);
+        mActivity.startActivityForResult(intent, OPEN_CAMERA_REQUEST);
+    }
+
+    /**
+     * 获取当前屏幕方向
+     */
+    @JavascriptInterface
+    public void getScreenDirection() {
+        List mlist = new ArrayList();
+        if (mActivity instanceof MainAty) {
+            mlist.addAll(((MainAty) mActivity).getScreenDirection());
+        }
+        LogUtils.e(TAG, "当前屏幕手持角度:" + String.valueOf(mlist.get(0)) + "°\n当前屏幕手持方向:" + String.valueOf(mlist.get(1)));
+    }
+
+    /**
+     * 调用拍照
+     */
+    File cameraSavePath2;
+    Uri uri2;//照片uri
+
+    @JavascriptInterface
+    public void getPAndQ() {
+        if (ContextCompat.checkSelfPermission(mActivity, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(mActivity, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(mActivity, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                mActivity.requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.CAMERA}, OPEN_REQUEST_CAMERA);
+            } else {
+                getPAndQChild();
+            }
+        } else {
+            getPAndQChild();
+        }
+    }
+
+    public void getPAndQChild() {
+        cameraSavePath2 = new File(Environment.getExternalStorageDirectory().getPath() + "/" + System.currentTimeMillis() + ".jpg");
+        if (mActivity instanceof MainAty) {
+            ((MainAty) mActivity).saveCameraSavePath2 = cameraSavePath2;
+        }
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            //第二个参数为 包名.fileprovider
+            uri2 = FileProvider.getUriForFile(mActivity, "com.szht.htappfuture", cameraSavePath2);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } else {
+            uri2 = Uri.fromFile(cameraSavePath2);
+        }
+        intent.putExtra(MediaStore.EXTRA_OUTPUT, uri2);
+        mActivity.startActivityForResult(intent, OPEN_CAMERA_QRREQUEST);
+    }
+
+    /**
+     * 指纹识别模块
+     */
+
+    private static final String DEFAULT_KEY_NAME = "default_key";
+    KeyStore keyStore;
+    private BiometricsEntity biometricsEntity;
+
+    //检测当前手机是否支持 指纹、人脸识别
+    @JavascriptInterface
+    public void checkBiometrics() {
+        int flg;
+        if (Build.VERSION.SDK_INT < 23) {
+            flg = -1;
+        } else {
+            flg = 1;
+        }
+        url = "javascript:setCheckBiometricsResult('" + flg + "')";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
+                // nothing
+            }));
+        } else {
+            mWebView.post(() -> mWebView.loadUrl(url));
+        }
+    }
+
+    //调用当前手机的指纹验证
+    @JavascriptInterface
+    public void doBiometrics(String json) {
+        try {
+            biometricsEntity = new Gson().fromJson(json, BiometricsEntity.class);
+            if (Build.VERSION.SDK_INT < 23) {
+                showToast("您的系统版本过低，不支持指纹功能", 1);
+            } else if (Build.VERSION.SDK_INT > 23 && Build.VERSION.SDK_INT < 28) {
+                if (isZhiwen()) {
+                    initKey();
+                    initCipher();
+                }
+            } else {  //Todo   没有适配28以上的手机
+                if (isZhiwen()) {
+                    initKey();
+                    initCipher();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            LogUtils.e(TAG, e.toString());
+        }
+    }
+
+    //判断当前手机是否能指纹识别
+    @SuppressLint("MissingPermission")
+    @TargetApi(Build.VERSION_CODES.M)
+    public boolean isZhiwen() {
+        KeyguardManager keyguardManager = mActivity.getSystemService(KeyguardManager.class);
+        FingerprintManager fingerprintManager = mActivity.getSystemService(FingerprintManager.class);
+        if (!fingerprintManager.isHardwareDetected()) {
+            showToast("您的手机不支持指纹功能", 1);
+            return false;
+        } else if (!keyguardManager.isKeyguardSecure()) {
+            dialog("您还未设置锁屏，请先设置锁屏并添加一个指纹");
+            return false;
+        } else if (!fingerprintManager.hasEnrolledFingerprints()) {
+            dialog("您至少需要在系统设置中添加一个指纹");
+            return false;
+        }
+        return true;
+    }
+
+    public void dialog(String contentStr) {
+        SweetAlertDialog sweetAlertDialog = new SweetAlertDialog(mActivity, SweetAlertDialog.NORMAL_TYPE);
+        sweetAlertDialog
+                .setTitleText("指纹录入")
+                .setContentText(contentStr)
+                .setCancelText("取消")
+                .setConfirmText("好的，我去录入指纹")
+                .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
+                    @Override
+                    public void onClick(SweetAlertDialog sweetAlertDialog) {
+                        PhoneInfoCheck.getInstance(mActivity, BRAND).startFingerprint();
+                    }
+                })
+                .show();
+    }
+
+    @TargetApi(23)
+    private void initKey() {
+        try {
+            keyStore = KeyStore.getInstance("AndroidKeyStore");
+            keyStore.load(null);
+            KeyGenerator keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+            KeyGenParameterSpec.Builder builder = new KeyGenParameterSpec.Builder(DEFAULT_KEY_NAME,
+                    KeyProperties.PURPOSE_ENCRYPT |
+                            KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
+                    .setUserAuthenticationRequired(true)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7);
+            keyGenerator.init(builder.build());
+            keyGenerator.generateKey();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @TargetApi(23)
+    private void initCipher() {
+        try {
+            SecretKey key = (SecretKey) keyStore.getKey(DEFAULT_KEY_NAME, null);
+            Cipher cipher = Cipher.getInstance(KeyProperties.KEY_ALGORITHM_AES + "/"
+                    + KeyProperties.BLOCK_MODE_CBC + "/"
+                    + KeyProperties.ENCRYPTION_PADDING_PKCS7);
+            cipher.init(Cipher.ENCRYPT_MODE, key);
+            showFingerPrintDialog(cipher);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void showFingerPrintDialog(Cipher cipher) {
+        FingerprintDialogFragment fragment = new FingerprintDialogFragment();
+        fragment.setCipher(cipher);
+        fragment.setBiometricsEntity(biometricsEntity);
+        fragment.show(mActivity.getFragmentManager(), "fingerprint");
+    }
+
+    /**
+     * 指纹需要的方法  回调
+     */
+    //指纹识别成功
+    public void setDoBiometricsResult() {
+        url = "javascript:setDoBiometricsResult()";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
+                // nothing
+            }));
+        } else {
+            mWebView.post(() -> mWebView.loadUrl(url));
+        }
+    }
+
+    //点击其他按钮
+    public void otherTxtMethord() {
+        url = "javascript:" + biometricsEntity.getCallbackMethod() + "()";
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            mWebView.post(() -> mWebView.evaluateJavascript(url, s -> {
+                // nothing
+            }));
+        } else {
+            mWebView.post(() -> mWebView.loadUrl(url));
+        }
+    }
 }

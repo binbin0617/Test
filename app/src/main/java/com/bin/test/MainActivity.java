@@ -1,22 +1,16 @@
 package com.bin.test;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import android.util.Base64;
+import android.support.v7.app.AppCompatActivity;
 import android.view.View;
-import android.widget.ImageView;
 
-import com.alibaba.fastjson.JSON;
 import com.bin.mylibrary.aty.MainAty;
 import com.bin.mylibrary.base.BaseWebAty;
 import com.bin.mylibrary.utils.LogUtils;
-import com.bumptech.glide.Glide;
 
 public class MainActivity extends AppCompatActivity {
     @Override
@@ -28,7 +22,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void click(View view) {
-        BaseWebAty.init("http://114.115.181.185:8080/wsyy/index.html");
+//        BaseWebAty.init("http://114.115.181.185:8080/wsyy/index.html");
+        BaseWebAty.init("http://114.115.204.49/htAppWeb2");
         startActivity(new Intent(this, MainAty.class));
     }
 

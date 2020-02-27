@@ -3,8 +3,6 @@ apply plugin: 'com.github.dcendents.android-maven'
 group='com.github.binbin0617'
 android {
     compileSdkVersion 28
-
-
     defaultConfig {
         minSdkVersion 19
         targetSdkVersion 28
@@ -31,6 +29,42 @@ android {
 
 }
 
+
+task clearJar(type: Delete) {
+
+    delete 'libs/szhtSDK.jar' //sdk是你自己jar包的名字，随便命名
+
+}
+
+task makeJar(type:org.gradle.api.tasks.bundling.Jar) {
+
+//指定生成的jar名
+
+    baseName 'szhtSDK'
+
+//从哪里打包class文件
+
+    from('build/intermediates/classes/debug/org/cmdmac/cloud/pluginsdk/')
+
+//打包到jar后的目录结构
+
+    into('org/cmdmac/cloud/pluginsdk/')
+
+//去掉不需要打包的目录和文件
+
+    exclude('test/','BuildConfig.class', 'R.class')
+
+//去掉R开头的文件
+
+    exclude{
+        it.name.startsWith('R')
+    }
+
+}
+
+makeJar.dependsOn(clearJar, build)
+
+
 dependencies {
     testImplementation 'junit:junit:4.12'
     //noinspection GradleCompatible
@@ -41,11 +75,14 @@ dependencies {
     implementation 'com.android.support:design:28.0.0'
     api 'com.pnikosis:materialish-progress:1.0'
     // agentWeb 加强版webview
-    api 'com.just.agentweb:agentweb:4.1.2' // (必选)
-    api 'com.just.agentweb:filechooser:4.1.2'// (可选)
-    api 'com.download.library:Downloader:4.1.2'// (可选)
+    api 'com.just.agentweb:agentweb:4.1.2'
+    // (必选)
+    api 'com.just.agentweb:filechooser:4.1.2'
+    // (可选)
+    api 'com.download.library:Downloader:4.1.2'
+    // (可选)
     // webview页面图片长按查看
-    api 'it.sephiroth.android.library.imagezoom:imagezoom:+'
+    implementation 'it.sephiroth.android.library.imagezoom:imagezoom:2.3.0'
     // json转换
     api 'com.alibaba:fastjson:1.1.71.android'
     //Glide加载图片
@@ -63,10 +100,6 @@ dependencies {
     //上下滑动插件
     api 'com.lcodecorex:tkrefreshlayout:1.0.7'
     api 'com.github.Justson:CoolIndicator:v1.0.0'
-    //App更新https://beta.bugly.qq.com
-    api 'com.tencent.bugly:crashreport_upgrade:1.2.0'
-    //其中latest.release指代最新版本号，也可以指定明确的版本号，例如1.2.0
-    api 'com.tencent.bugly:nativecrashreport:2.2.0'
     //其中latest.release指代最新版本号，也可以指定明确的版本号，例如2.2.0
     api 'org.greenrobot:eventbus:3.0.0'
     //adapter
@@ -74,15 +107,25 @@ dependencies {
     api('com.zhihu.android:matisse:0.5.2-beta2') {
         exclude group: 'it.sephiroth.android.library.imagezoom'//加载时排除这个包
     }
+    api 'org.conscrypt:conscrypt-openjdk:1.1.3:'
     //知乎图片选择器
     api 'com.github.f0ris.sweetalert:library:1.5.1'
+    //底部菜单（照片、拍照、上传文件）
+    implementation 'com.github.zhaolei9527:BottomMenu:v1.0.1'
+
     api files('libs/android-core-3.3.1-SNAPSHOT.jar')
     api files('libs/CFCAMLog.jar')
     api files('libs/commons-codec-1.9.jar')
     api files('libs/core-3.3.1-SNAPSHOT.jar')
+    api files('libs/HKE_SDK-v5.5.0.2.jar')
     api files('libs/HKESipEditText.jar')
     api files('libs/ksoap2-android-assembly-3.3.0-jar-with-dependencies.jar')
+    api files('libs/license.jar')
+    api files('libs/Msc.jar')
+    api files('libs/ocr-sdk.jar')
     api files('libs/VoiceRecognition-2.1.20.jar')
     api files('libs/wsdl4j-1.6.1.jar')
-    implementation files('libs/HKE_SDK-v5.5.0.2.jar')
+    api files('libs/ast.jar')
+    api files('libs/baidu_license.jar')
+    api files('libs/FaceSDK.jar')
 }

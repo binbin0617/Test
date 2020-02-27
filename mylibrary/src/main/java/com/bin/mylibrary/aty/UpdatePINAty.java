@@ -2,11 +2,11 @@ package com.bin.mylibrary.aty;
 
 import android.content.Context;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 
 import com.bin.mylibrary.R;
 import com.bin.mylibrary.base.BaseAty;

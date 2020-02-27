@@ -1,8 +1,8 @@
 package com.bin.mylibrary.cossphoto;
 
 import android.app.Activity;
+import android.support.annotation.NonNull;
 
-import androidx.annotation.NonNull;
 
 import java.lang.ref.SoftReference;
 import java.util.HashMap;
